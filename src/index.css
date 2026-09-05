@@ -1,0 +1,69 @@
+@import "tailwindcss";
+
+@theme {
+  --color-accent: #f5c542;
+  --color-accent-dim: #b8922b;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+}
+
+html, body, #root { height: 100%; }
+body { overscroll-behavior: none; }
+
+/* checkerboard for transparent previews */
+.checker {
+  background-color: #1a1a1a;
+  background-image:
+    linear-gradient(45deg, #242424 25%, transparent 25%),
+    linear-gradient(-45deg, #242424 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #242424 75%),
+    linear-gradient(-45deg, transparent 75%, #242424 75%);
+  background-size: 20px 20px;
+  background-position: 0 0, 0 10px, 10px -10px, -10px 0;
+}
+
+/* range sliders */
+input[type="range"].range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 22px;
+  background: transparent;
+  cursor: pointer;
+  touch-action: pan-y;
+}
+input[type="range"].range::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(to right, var(--color-accent) 0 var(--fill, 50%), #3a3a3a var(--fill, 50%) 100%);
+}
+input[type="range"].range::-moz-range-track {
+  height: 4px; border-radius: 999px; background: #3a3a3a;
+}
+input[type="range"].range::-moz-range-progress {
+  height: 4px; border-radius: 999px; background: var(--color-accent);
+}
+input[type="range"].range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px; height: 16px; margin-top: -6px;
+  border-radius: 999px;
+  background: #fafafa;
+  border: 2px solid var(--color-accent);
+  box-shadow: 0 1px 4px rgba(0,0,0,.6);
+  transition: transform .12s ease;
+}
+input[type="range"].range::-moz-range-thumb {
+  width: 14px; height: 14px; border-radius: 999px;
+  background: #fafafa; border: 2px solid var(--color-accent);
+}
+input[type="range"].range:active::-webkit-slider-thumb { transform: scale(1.2); }
+
+.scrollbar-thin::-webkit-scrollbar { width: 8px; }
+.scrollbar-thin::-webkit-scrollbar-thumb { background: #333; border-radius: 8px; }
+
+@keyframes shimmer { 0% { background-position: -200% 0 } 100% { background-position: 200% 0 } }
+.shimmer {
+  background: linear-gradient(90deg, #262626 25%, #3a3a3a 50%, #262626 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.2s linear infinite;
+}
