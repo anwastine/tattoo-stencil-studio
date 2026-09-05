@@ -55,6 +55,15 @@ const DEFAULT_OUTPUT = {
   exportWidth: 1800,
 }
 
+const AI_STYLES = [
+  { value: 'studio', label: 'Studio stencil', desc: 'Flow lines, skin stipple, hatched lips' },
+  { value: 'fineline', label: 'Fine line', desc: 'Thin minimal contours' },
+  { value: 'bold', label: 'Bold traditional', desc: 'Heavy outlines, chunky dots' },
+  { value: 'dotwork', label: 'Dotwork', desc: 'Everything in dots' },
+  { value: 'realism', label: 'Realism map', desc: 'Every contour + shadow zones' },
+]
+const AI_SEND_MAX = 1536 // long side sent to the model
+
 const INKS = [
   { name: 'Black', value: '#0a0a0a' },
   { name: 'Stencil purple', value: '#5b2a86' },
@@ -322,6 +331,8 @@ export default function App() {
   const [error, setError] = useState(null)
   const [fit, setFit] = useState({ w: 0, h: 0 })
   const [quality, setQuality] = useState('full') // 'fast' while dragging a slider
+  const [ai, setAi] = useState({ style: 'studio', size: '2K', busy: false, error: null, result: null, threshold: 0 })
+  const aiCanvasRef = useRef(null)
 
   const previewRef = useRef(null) // stencil canvas
   const originalRef = useRef(null) // original canvas (preview res)
@@ -475,6 +486,98 @@ export default function App() {
     return () => ro.disconnect()
   }, [preview])
 
+  /* ---------------- AI stencil ---------------- */
+  const generateAI = useCallback(async () => {
+    if (!source) return
+    setAi((a) => ({ ...a, busy: true, error: null }))
+    try {
+      const s = Math.min(1, AI_SEND_MAX / Math.max(source.w, source.h))
+      const w = Math.round(source.w * s), h = Math.round(source.h * s)
+      const c = document.createElement('canvas')
+      c.width = w
+      c.height = h
+      const ctx = c.getContext('2d')
+      ctx.imageSmoothingQuality = 'high'
+      ctx.drawImage(source.bitmap, 0, 0, w, h)
+      const image = c.toDataURL('image/jpeg', 0.92)
+      const r = await fetch('/api/stencil', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ image, style: ai.style, size: ai.size, width: w, height: h }),
+      })
+      const json = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(json.error || `Server error ${r.status}`)
+      const blob = await (await fetch(json.image)).blob()
+      const bitmap = await createImageBitmap(blob)
+      setAi((a) => ({ ...a, busy: false, result: { bitmap, w: bitmap.width, h: bitmap.height, model: json.model, ms: json.ms } }))
+      setView('ai')
+    } catch (e) {
+      console.error(e)
+      setAi((a) => ({ ...a, busy: false, error: e.message }))
+    }
+  }, [source, ai.style, ai.size])
+
+  /* draw the AI result (with optional clean-up) onto a canvas */
+  const renderAI = useCallback((ctx, targetW, targetH) => {
+    const res = ai.result
+    if (!res) return
+    const cw = ctx.canvas.width, ch = ctx.canvas.height
+    ctx.save()
+    ctx.setTransform(1, 0, 0, 1, 0, 0)
+    ctx.clearRect(0, 0, cw, ch)
+    if (out.mirror) { ctx.translate(cw, 0); ctx.scale(-1, 1) }
+    ctx.imageSmoothingQuality = 'high'
+    ctx.drawImage(res.bitmap, 0, 0, targetW, targetH)
+    ctx.restore()
+    // clean-up: map luminance → ink alpha, threshold, recolour
+    const img = ctx.getImageData(0, 0, cw, ch)
+    const d = img.data
+    const [ir, ig, ib] = hexToRgb(out.ink)
+    const white = out.bg === 'white'
+    const thr = ai.threshold // 0 = keep anti-aliasing, >0 = hard black/white cut
+    for (let i = 0; i < d.length; i += 4) {
+      const lum = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]
+      let inkA = 1 - lum / 255
+      if (thr > 0) inkA = inkA > thr ? 1 : 0
+      if (white) {
+        d[i] = Math.round(255 + (ir - 255) * inkA)
+        d[i + 1] = Math.round(255 + (ig - 255) * inkA)
+        d[i + 2] = Math.round(255 + (ib - 255) * inkA)
+        d[i + 3] = 255
+      } else {
+        d[i] = ir; d[i + 1] = ig; d[i + 2] = ib
+        d[i + 3] = Math.round(inkA * 255)
+      }
+    }
+    ctx.putImageData(img, 0, 0)
+  }, [ai.result, ai.threshold, out])
+
+  useEffect(() => {
+    const c = aiCanvasRef.current
+    if (!c || !ai.result) return
+    const s = Math.min(1, PREVIEW_MAX / Math.max(ai.result.w, ai.result.h))
+    c.width = Math.round(ai.result.w * s)
+    c.height = Math.round(ai.result.h * s)
+    renderAI(c.getContext('2d', { willReadFrequently: true }), c.width, c.height)
+  }, [ai.result, renderAI])
+
+  const exportAI = useCallback(async () => {
+    if (!ai.result) return
+    const c = document.createElement('canvas')
+    c.width = ai.result.w
+    c.height = ai.result.h
+    renderAI(c.getContext('2d', { willReadFrequently: true }), c.width, c.height)
+    const blob = await new Promise((r) => c.toBlob(r, 'image/png'))
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${source?.name || 'portrait'}-ai-stencil-${ai.style}${out.mirror ? '-mirrored' : ''}.png`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 2000)
+  }, [ai.result, ai.style, renderAI, out.mirror, source])
+
   /* ---------------- export ---------------- */
   const exportPNG = useCallback(async () => {
     if (!source || !preview) return
@@ -569,7 +672,7 @@ export default function App() {
           <button
             type="button"
             disabled={!source || exporting}
-            onClick={exportPNG}
+            onClick={view === 'ai' && ai.result ? exportAI : exportPNG}
             className="flex items-center gap-2 rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-neutral-950 hover:bg-accent-dim disabled:cursor-not-allowed disabled:opacity-40"
           >
             {exporting ? (
@@ -612,14 +715,18 @@ export default function App() {
               value={view}
               onChange={setView}
               options={[
-                { value: 'stencil', label: 'Stencil' },
+                { value: 'stencil', label: 'Algorithm' },
+                ...(ai.result ? [{ value: 'ai', label: 'AI' }] : []),
                 { value: 'split', label: 'Compare' },
                 { value: 'original', label: 'Original' },
               ]}
             />
             <div className="flex items-center gap-3 text-[11px] text-neutral-500">
               {busy && <span className="flex items-center gap-1.5"><span className="h-2 w-2 animate-pulse rounded-full bg-accent" />{stats?.fast ? 'quick preview' : 'processing'}</span>}
-              {stats && (
+              {view === 'ai' && ai.result && (
+                <span className="font-mono tabular-nums">{ai.result.w}×{ai.result.h} · {ai.result.model} · {(ai.result.ms / 1000).toFixed(1)} s</span>
+              )}
+              {stats && view !== 'ai' && (
                 <span className="font-mono tabular-nums">
                   {stats.w}×{stats.h} · {stats.dots.toLocaleString()} dots{stats.segs ? ` · ${stats.segs.toLocaleString()} strokes` : ''} · {Math.round(stats.ms)} ms
                 </span>
@@ -650,12 +757,13 @@ export default function App() {
                 style={{ width: fit.w || undefined, height: fit.h || undefined }}
                 onPointerDown={onSplitPointer}
               >
-                <canvas ref={previewRef} className="block h-full w-full" />
+                <canvas ref={previewRef} className="block h-full w-full" style={{ display: view === 'ai' ? 'none' : 'block' }} />
+                <canvas ref={aiCanvasRef} className="absolute inset-0 h-full w-full" style={{ display: view === 'ai' ? 'block' : 'none' }} />
                 <canvas
                   ref={originalRef}
                   className="absolute inset-0 h-full w-full"
                   style={{
-                    display: view === 'stencil' ? 'none' : 'block',
+                    display: view === 'stencil' || view === 'ai' ? 'none' : 'block',
                     clipPath: view === 'split' ? `inset(0 ${100 - split}% 0 0)` : undefined,
                     transform: out.mirror ? 'scaleX(-1)' : undefined,
                   }}
@@ -679,6 +787,57 @@ export default function App() {
           className="scrollbar-thin space-y-3 lg:overflow-y-auto lg:pr-1"
           onPointerDown={(e) => { if (e.target.matches('input[type="range"]')) setQuality('fast') }}
         >
+          {/* AI stencil */}
+          <div className="rounded-xl border border-accent/40 bg-gradient-to-b from-accent/10 to-transparent p-3">
+            <div className="mb-2 flex items-center justify-between px-1">
+              <p className="text-[11px] font-medium tracking-wider text-accent uppercase">AI stencil</p>
+              <span className="text-[10px] text-neutral-500">Gemini image model</span>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-2">
+              {AI_STYLES.map((st) => (
+                <button
+                  key={st.value}
+                  type="button"
+                  onClick={() => setAi((a) => ({ ...a, style: st.value }))}
+                  className={`rounded-lg border px-2.5 py-2 text-left ${ai.style === st.value ? 'border-accent bg-accent/10' : 'border-neutral-800 bg-neutral-800/50 hover:border-neutral-600'}`}
+                  title={st.desc}
+                >
+                  <span className="block text-xs font-medium">{st.label}</span>
+                  <span className="block truncate text-[10px] text-neutral-500">{st.desc}</span>
+                </button>
+              ))}
+            </div>
+            <div className="mt-2">
+              <Segmented value={ai.size} onChange={(v) => setAi((a) => ({ ...a, size: v }))} options={[{ value: '1K', label: '1K' }, { value: '2K', label: '2K' }, { value: '4K', label: '4K' }]} />
+            </div>
+            <button
+              type="button"
+              disabled={!source || ai.busy}
+              onClick={generateAI}
+              className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-accent py-2.5 text-sm font-semibold text-neutral-950 hover:bg-accent-dim disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {ai.busy ? (
+                <>
+                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-neutral-900/30 border-t-neutral-900" />
+                  Drawing… (10–40 s)
+                </>
+              ) : (
+                <>✦ Generate AI stencil</>
+              )}
+            </button>
+            {ai.error && <p className="mt-2 rounded-md bg-red-900/40 px-2 py-1.5 text-[11px] leading-snug text-red-200">{ai.error}</p>}
+            {ai.result && (
+              <div className="mt-3 space-y-3 border-t border-neutral-800 pt-3">
+                <Toggle label="Hard black & white" hint="Threshold the drawing to pure ink for thermal transfer" checked={ai.threshold > 0} onChange={(v) => setAi((a) => ({ ...a, threshold: v ? 0.45 : 0 }))} />
+                {ai.threshold > 0 && (
+                  <Slider label="Ink cut-off" value={ai.threshold} min={0.1} max={0.9} step={0.01} format={(v) => `${Math.round(v * 100)}%`} onChange={(v) => setAi((a) => ({ ...a, threshold: v }))} hint="Lower keeps faint marks; higher keeps only solid ink." />
+                )}
+                <p className="text-[11px] text-neutral-500">Ink colour, background and mirror from the Output section apply to the AI stencil too. Not happy? Generate again — every run is a fresh drawing.</p>
+              </div>
+            )}
+            <p className="mt-2 px-1 text-[10px] leading-snug text-neutral-500">Sends a downsized copy of the photo to Google's Gemini image model. Costs the owner roughly $0.05–0.15 per image.</p>
+          </div>
+
           {/* presets */}
           <div className="rounded-xl border border-neutral-800 bg-neutral-900/70 p-3">
             <p className="mb-2 px-1 text-[11px] font-medium tracking-wider text-neutral-500 uppercase">Presets</p>
@@ -828,8 +987,8 @@ export default function App() {
       {/* mobile sticky export */}
       {source && (
         <div className="sticky bottom-0 z-10 border-t border-neutral-800 bg-neutral-950/90 p-3 backdrop-blur lg:hidden">
-          <button type="button" disabled={exporting} onClick={exportPNG} className="w-full rounded-lg bg-accent py-3 text-sm font-semibold text-neutral-950 disabled:opacity-50">
-            {exporting ? 'Rendering high-res…' : `Export PNG · ${out.exportWidth === 'original' ? 'original size' : out.exportWidth + ' px'}`}
+          <button type="button" disabled={exporting} onClick={view === 'ai' && ai.result ? exportAI : exportPNG} className="w-full rounded-lg bg-accent py-3 text-sm font-semibold text-neutral-950 disabled:opacity-50">
+            {exporting ? 'Rendering high-res…' : view === 'ai' && ai.result ? `Export AI stencil · ${ai.result.w} px` : `Export PNG · ${out.exportWidth === 'original' ? 'original size' : out.exportWidth + ' px'}`}
           </button>
         </div>
       )}

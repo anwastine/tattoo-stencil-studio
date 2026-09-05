@@ -27,13 +27,36 @@ npm run preview    # serves dist/ on :8801
 `dist/` is plain static HTML/JS – host it on Vercel, Netlify, GitHub Pages,
 or any file server.
 
+## AI stencil mode (optional, needs a key)
+
+The **AI stencil** panel sends a downsized copy of the photo to Google's
+Gemini image model ("Nano Banana") with a tattoo-stencil prompt and shows the
+redrawn result next to the algorithmic one. Five styles (studio, fine line,
+bold traditional, dotwork, realism map), 1K/2K/4K output, optional hard
+black-and-white threshold, and the same ink/background/mirror export options.
+
+Setup:
+
+1. Create a key at https://aistudio.google.com/apikey
+2. Vercel → project → Settings → Environment Variables → add
+   `GEMINI_API_KEY` (all environments) → redeploy.
+   Optional: `GEMINI_IMAGE_MODEL` (default `gemini-3.1-flash-image`;
+   `gemini-3-pro-image` for the highest quality).
+3. Locally: `GEMINI_API_KEY=... npm run dev` (the dev server mounts
+   `api/stencil.js` at `/api/stencil`).
+
+Cost is roughly $0.05–0.15 per image depending on model and size. The key
+never reaches the browser; only the serverless function uses it.
+
 ## File structure
 
 ```
 tattoostencil/
 ├── index.html               # Vite entry
 ├── package.json
-├── vite.config.js           # React + Tailwind v4 plugins
+├── vite.config.js           # React + Tailwind v4 plugins + local /api bridge
+├── vercel.json              # function timeout/memory for api/stencil.js
+├── api/stencil.js           # Vercel serverless function → Gemini image model
 ├── public/samples/portrait.jpg   # demo image (public domain)
 └── src/
     ├── main.jsx             # React bootstrap
