@@ -331,7 +331,7 @@ export default function App() {
   const [error, setError] = useState(null)
   const [fit, setFit] = useState({ w: 0, h: 0 })
   const [quality, setQuality] = useState('full') // 'fast' while dragging a slider
-  const [ai, setAi] = useState({ style: 'studio', size: '2K', busy: false, error: null, result: null, threshold: 0 })
+  const [ai, setAi] = useState({ provider: 'openai', providers: null, style: 'studio', size: '2K', busy: false, error: null, result: null, threshold: 0 })
   const aiCanvasRef = useRef(null)
 
   const previewRef = useRef(null) // stencil canvas
@@ -487,6 +487,13 @@ export default function App() {
   }, [preview])
 
   /* ---------------- AI stencil ---------------- */
+  useEffect(() => {
+    fetch('/api/stencil')
+      .then((r) => r.json())
+      .then((j) => setAi((a) => ({ ...a, providers: j.providers || [], models: j.models || {}, provider: j.providers?.includes(a.provider) ? a.provider : j.providers?.[0] || a.provider })))
+      .catch(() => setAi((a) => ({ ...a, providers: [] })))
+  }, [])
+
   const generateAI = useCallback(async () => {
     if (!source) return
     setAi((a) => ({ ...a, busy: true, error: null }))
@@ -503,19 +510,19 @@ export default function App() {
       const r = await fetch('/api/stencil', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ image, style: ai.style, size: ai.size, width: w, height: h }),
+        body: JSON.stringify({ image, provider: ai.provider, style: ai.style, size: ai.size, width: w, height: h }),
       })
       const json = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(json.error || `Server error ${r.status}`)
       const blob = await (await fetch(json.image)).blob()
       const bitmap = await createImageBitmap(blob)
-      setAi((a) => ({ ...a, busy: false, result: { bitmap, w: bitmap.width, h: bitmap.height, model: json.model, ms: json.ms } }))
+      setAi((a) => ({ ...a, busy: false, result: { bitmap, w: bitmap.width, h: bitmap.height, model: json.model, provider: json.provider, ms: json.ms } }))
       setView('ai')
     } catch (e) {
       console.error(e)
       setAi((a) => ({ ...a, busy: false, error: e.message }))
     }
-  }, [source, ai.style, ai.size])
+  }, [source, ai.style, ai.size, ai.provider])
 
   /* draw the AI result (with optional clean-up) onto a canvas */
   const renderAI = useCallback((ctx, targetW, targetH) => {
@@ -791,7 +798,19 @@ export default function App() {
           <div className="rounded-xl border border-accent/40 bg-gradient-to-b from-accent/10 to-transparent p-3">
             <div className="mb-2 flex items-center justify-between px-1">
               <p className="text-[11px] font-medium tracking-wider text-accent uppercase">AI stencil</p>
-              <span className="text-[10px] text-neutral-500">Gemini image model</span>
+              <span className="text-[10px] text-neutral-500">
+                {ai.providers === null ? 'checking…' : ai.providers.length ? `${ai.providers.length} provider${ai.providers.length > 1 ? 's' : ''} ready` : 'no key configured'}
+              </span>
+            </div>
+            <div className="mb-2">
+              <Segmented
+                value={ai.provider}
+                onChange={(v) => setAi((a) => ({ ...a, provider: v }))}
+                options={[
+                  { value: 'openai', label: `OpenAI${ai.providers && !ai.providers.includes('openai') ? ' ✕' : ''}` },
+                  { value: 'gemini', label: `Gemini${ai.providers && !ai.providers.includes('gemini') ? ' ✕' : ''}` },
+                ]}
+              />
             </div>
             <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-2">
               {AI_STYLES.map((st) => (
@@ -835,7 +854,7 @@ export default function App() {
                 <p className="text-[11px] text-neutral-500">Ink colour, background and mirror from the Output section apply to the AI stencil too. Not happy? Generate again — every run is a fresh drawing.</p>
               </div>
             )}
-            <p className="mt-2 px-1 text-[10px] leading-snug text-neutral-500">Sends a downsized copy of the photo to Google's Gemini image model. Costs the owner roughly $0.05–0.15 per image.</p>
+            <p className="mt-2 px-1 text-[10px] leading-snug text-neutral-500">Sends a downsized copy of the photo to {ai.provider === 'openai' ? "OpenAI's GPT Image model" : "Google's Gemini image model"}. Costs the owner roughly $0.05–0.25 per image depending on size.</p>
           </div>
 
           {/* presets */}

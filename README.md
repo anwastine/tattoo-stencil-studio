@@ -29,24 +29,29 @@ or any file server.
 
 ## AI stencil mode (optional, needs a key)
 
-The **AI stencil** panel sends a downsized copy of the photo to Google's
-Gemini image model ("Nano Banana") with a tattoo-stencil prompt and shows the
-redrawn result next to the algorithmic one. Five styles (studio, fine line,
-bold traditional, dotwork, realism map), 1K/2K/4K output, optional hard
-black-and-white threshold, and the same ink/background/mirror export options.
+The **AI stencil** panel sends a downsized copy of the photo to an
+image-to-image model with a tattoo-stencil prompt and shows the redrawn
+result next to the algorithmic one. Two providers, switchable in the panel:
 
-Setup:
+- **OpenAI** GPT Image (`gpt-image-2`, falls back to `gpt-image-1.5` / `gpt-image-1`) via `/v1/images/edits`
+- **Google Gemini** image model (`gemini-3.1-flash-image`, falls back to `gemini-2.5-flash-image`)
 
-1. Create a key at https://aistudio.google.com/apikey
-2. Vercel → project → Settings → Environment Variables → add
-   `GEMINI_API_KEY` (all environments) → redeploy.
-   Optional: `GEMINI_IMAGE_MODEL` (default `gemini-3.1-flash-image`;
-   `gemini-3-pro-image` for the highest quality).
-3. Locally: `GEMINI_API_KEY=... npm run dev` (the dev server mounts
+Five styles (studio, fine line, bold traditional, dotwork, realism map),
+1K/2K/4K output, optional hard black-and-white threshold, and the same
+ink/background/mirror export options as the algorithmic stencil.
+
+Setup (either key is enough; both can be set):
+
+1. OpenAI key: https://platform.openai.com/api-keys → Vercel env var `OPENAI_API_KEY`
+   Gemini key: https://aistudio.google.com/apikey → Vercel env var `GEMINI_API_KEY`
+2. Vercel → project → Settings → Environment Variables → add the variable for
+   all environments → Deployments → Redeploy.
+   Optional overrides: `OPENAI_IMAGE_MODEL`, `GEMINI_IMAGE_MODEL`.
+3. Locally: `OPENAI_API_KEY=... npm run dev` (the dev server mounts
    `api/stencil.js` at `/api/stencil`).
 
-Cost is roughly $0.05–0.15 per image depending on model and size. The key
-never reaches the browser; only the serverless function uses it.
+Cost is roughly $0.05–0.25 per image depending on provider and size. Keys
+never reach the browser; only the serverless function uses them.
 
 ## File structure
 
@@ -56,7 +61,7 @@ tattoostencil/
 ├── package.json
 ├── vite.config.js           # React + Tailwind v4 plugins + local /api bridge
 ├── vercel.json              # function timeout/memory for api/stencil.js
-├── api/stencil.js           # Vercel serverless function → Gemini image model
+├── api/stencil.js           # Vercel serverless function → OpenAI / Gemini image models
 ├── public/samples/portrait.jpg   # demo image (public domain)
 └── src/
     ├── main.jsx             # React bootstrap
