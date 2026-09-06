@@ -1,3 +1,8 @@
 {
-  "functions": { "api/stencil.js": { "maxDuration": 120, "memory": 1024 } }
+  "functions": {
+    "api/stencil.js": {
+      "maxDuration": 300,
+      "memory": 1024
+    }
+  }
 }

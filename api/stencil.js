@@ -23,7 +23,8 @@ const OPENAI_MODELS = [process.env.OPENAI_IMAGE_MODEL, 'gpt-image-2', 'gpt-image
 const BASE = `You are a master tattoo artist preparing a transfer stencil from this portrait photo.
 Redraw the photo as a hand-inked tattoo stencil drawing:
 - Keep the exact likeness, proportions, expression, pose, crop and composition of the person. Do not beautify or change the face.
-- Pure black ink on a plain flat white background. No grey tones, no gradients, no colour, no paper texture, no frame, no border, no signature, no text, no watermark.
+- Pure black ink on a plain flat white background. Absolutely no grey tones, no smooth pencil or graphite shading, no soft gradients, no blending, no colour, no paper texture, no frame, no border, no signature, no text, no watermark.
+- All tone must be built only from discrete, individually visible black marks (dots, short strokes or hatch lines) that a thermal stencil printer can reproduce; every mark is either solid black or absent.
 - Leave the background completely empty white; draw only the person.`
 
 const STYLES = {
