@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from './api.js'
-import { GoogleSignIn, useSession } from './Auth.jsx'
+import { useSession } from './Auth.jsx'
+import SignIn, { Splash } from './SignIn.jsx'
 import { CreditTicket, AccountMenu, BuyCreditsModal } from './Wallet.jsx'
 import { startTattooCursor } from './cursors.js'
 
@@ -361,6 +362,21 @@ export default function App() {
   const canAfford = !user || user.credits >= perStencil
   const showResult = !!result && view !== 'original'
 
+  /* ---------------- gate ---------------- */
+  // Every hook above has already run, so these early returns are safe.
+  if (sessionLoading) return <Splash />
+  if (!signedIn) {
+    return (
+      <SignIn
+        config={config}
+        onSignedIn={(out) => {
+          refresh()
+          if (out?.isNew) setWelcome(out.welcomeCredits)
+        }}
+      />
+    )
+  }
+
   /* ------------------------------------------------------------------ */
 
   return (
@@ -382,14 +398,14 @@ export default function App() {
 
           <div className="flex shrink-0 items-center gap-2">
             <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => loadFile(e.target.files?.[0])} />
-            {signedIn && <CreditTicket credits={user.credits} onClick={() => setShowBuy(true)} />}
+            <CreditTicket credits={user.credits} onClick={() => setShowBuy(true)} />
             <button type="button" onClick={() => fileInputRef.current?.click()} className="btn-quiet hidden rounded-sm px-3 py-2 text-[11px] sm:block">
               {source ? 'New photo' : 'Upload'}
             </button>
             <button type="button" disabled={!result} onClick={exportPNG} className="btn-ink rounded-sm px-3.5 py-2 text-[11px] sm:px-4">
               Download
             </button>
-            {signedIn && <AccountMenu user={user} onBuy={() => setShowBuy(true)} onSignOut={signOut} />}
+            <AccountMenu user={user} onBuy={() => setShowBuy(true)} onSignOut={signOut} />
           </div>
         </div>
       </header>
@@ -509,37 +525,15 @@ export default function App() {
             </div>
 
             <div className="mt-4">
-              {sessionLoading ? (
-                <div className="h-12 animate-pulse rounded-sm bg-ink-4/60" />
-              ) : signedIn ? (
-                <>
-                  <button
-                    type="button"
-                    disabled={!source || busy || noKey}
-                    onClick={canAfford ? generate : () => setShowBuy(true)}
-                    className="btn-ink flex w-full items-center justify-center gap-2 rounded-sm py-3.5 text-[13px]"
-                  >
-                    {busy ? `Inking… ${elapsed}s` : !canAfford ? 'Add credits to continue' : result ? 'Ink it again' : 'Ink it'}
-                  </button>
-                  {!source && <p className="stamp mt-2 text-center text-[10px] text-paper-3/50">Pin a photo first</p>}
-                </>
-              ) : (
-                <div className="rule-double rounded-sm p-4 text-center">
-                  <p className="wordmark text-xl text-paper">{config?.welcomeCredits ?? 29} stencils, on the house</p>
-                  <p className="mx-auto mt-1.5 mb-3 max-w-[15rem] text-[12px] leading-snug text-paper-3/75">
-                    Sign in with Google and start drawing straight away. No card, no trial period.
-                  </p>
-                  <div className="flex justify-center">
-                    <GoogleSignIn
-                      clientId={config?.googleClientId}
-                      onSignedIn={(out) => {
-                        refresh()
-                        if (out?.isNew) setWelcome(out.welcomeCredits)
-                      }}
-                    />
-                  </div>
-                </div>
-              )}
+              <button
+                type="button"
+                disabled={!source || busy || noKey}
+                onClick={canAfford ? generate : () => setShowBuy(true)}
+                className="btn-ink flex w-full items-center justify-center gap-2 rounded-sm py-3.5 text-[13px]"
+              >
+                {busy ? `Inking… ${elapsed}s` : !canAfford ? 'Add credits to continue' : result ? 'Ink it again' : 'Ink it'}
+              </button>
+              {!source && <p className="stamp mt-2 text-center text-[10px] text-paper-3/50">Pin a photo first</p>}
               {noKey && <p className="mt-2 rounded-sm border border-red/50 bg-red/15 px-3 py-2 text-[11px] leading-snug text-paper-2">The drawing service is not configured yet. Add OPENAI_API_KEY in Vercel and redeploy.</p>}
               {error && <p className="mt-2 rounded-sm border border-red/50 bg-red/15 px-3 py-2 text-[11px] leading-snug text-paper-2">{error}</p>}
               {result && !error && <p className="mt-2 text-center text-[11px] text-paper-3/60">Every run is a fresh drawing. Not happy? Ink it again.</p>}
@@ -646,11 +640,11 @@ export default function App() {
           ) : (
             <button
               type="button"
-              disabled={busy || noKey || !signedIn}
+              disabled={busy || noKey}
               onClick={canAfford ? generate : () => setShowBuy(true)}
               className="btn-ink flex-1 rounded-sm py-3 text-[12px]"
             >
-              {!signedIn ? 'Sign in to draw' : busy ? `Inking… ${elapsed}s` : !canAfford ? 'Add credits' : 'Ink it'}
+              {busy ? `Inking… ${elapsed}s` : !canAfford ? 'Add credits' : 'Ink it'}
             </button>
           )}
         </div>
