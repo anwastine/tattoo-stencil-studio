@@ -1,7 +1,7 @@
 # Go-live checklist
 
-The app is built and deployed. Three outside accounts still have to be opened
-in your name — I can't create those for you. Each step below is done once.
+The app is built, deployed, and the database is live. One short step is left
+before people can sign in: creating the Google sign-in client.
 
 Live now: https://tattoo-stencil-studio-kappa.vercel.app
 
