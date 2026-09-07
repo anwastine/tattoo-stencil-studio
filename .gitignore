@@ -5,3 +5,9 @@ dist
 
 .env
 .env.local
+.env*
+
+# Neon marketplace agent skills (installed by the CLI, not part of the app)
+.agents/
+.claude/skills/
+skills-lock.json

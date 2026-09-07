@@ -15,28 +15,32 @@ Status right now:
 | Piece | State |
 | --- | --- |
 | Drawing (OpenAI) | ✅ working |
-| Sign in with Google | ⬜ needs step 2 |
-| Accounts + credits | ⬜ needs step 1 |
-| Card / UPI payments | ⬜ needs step 3 |
+| Accounts + credits database | ✅ done — Neon free plan, provisioned and tested |
+| Session key | ✅ done |
+| Sign in with Google | ⬜ **only this is left** — step 2, ~5 minutes |
+| Card / UPI payments | ⬜ step 3, whenever you want to start charging |
 
 ---
 
-## Step 1 — Database (5 minutes, free)
+## Step 1 — Database ✅ DONE
 
-Without this nobody can sign in, because there is nowhere to keep accounts and
-credit balances.
+A Neon Postgres database (**free plan**, `tattoo-stencil-db`) is provisioned
+and connected to production, preview and development. The four tables —
+users, welcome_grants, ledger, orders — are created and tested: a new account
+gets 29 credits, a repeat sign-in gets none, and two simultaneous requests
+cannot both spend the last credit.
 
-1. Open https://vercel.com/team-dighamster/tattoo-stencil-studio
-2. Click the **Storage** tab → **Create Database** → **Neon** (Postgres).
-3. Accept the free plan, then click **Connect Project** and pick
-   tattoo-stencil-studio.
+`SESSION_SECRET` is also set, for all three environments.
 
-`DATABASE_URL` is added for you. The tables build themselves the first time
-someone signs in — there is nothing to run.
+Nothing to do here.
 
 ---
 
-## Step 2 — Sign in with Google (10 minutes, free)
+## Step 2 — Sign in with Google (~5 minutes, free) ← **the only thing left**
+
+Send me the Client ID when you have it and I will put it into Vercel and
+redeploy — it is a public identifier, not a secret, so it is safe to paste
+here. (The client *secret* is never needed; don't send that.)
 
 1. Go to https://console.cloud.google.com/apis/credentials and sign in with
    anwastine@gmail.com. Create a project if it asks.
@@ -48,21 +52,13 @@ someone signs in — there is nothing to run.
 5. Click **Create** and copy the **Client ID** (it ends in
    `.apps.googleusercontent.com`). You do **not** need the client secret —
    don't add it anywhere.
-6. In Vercel add: `GOOGLE_CLIENT_ID` = that Client ID.
+6. Send me that Client ID, or add it in Vercel yourself as `GOOGLE_CLIENT_ID`.
 7. Still in Google Cloud, open **APIs & Services → OAuth consent screen**.
    Fill in the app name, your support email and developer contact. Keep the
    scopes to `email`, `profile`, `openid`. Then press **Publish app** —
    until you do, only accounts you list by hand can sign in.
-8. Generate a session key. On your Mac, in Terminal:
-
-   ```bash
-   openssl rand -hex 32
-   ```
-
-   Copy the long string it prints and add it in Vercel as `SESSION_SECRET`.
-   Keep it private; anyone with it could forge a login.
-
-Redeploy. Sign-in and the 29 free credits now work.
+Once the Client ID is in and the site redeploys, sign-in and the 29 free
+credits work immediately — the database behind them is already live.
 
 ---
 
