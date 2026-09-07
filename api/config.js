@@ -2,7 +2,7 @@
 import { handler, methods, send } from './_lib/http.js'
 import { publicConfig } from './_lib/config.js'
 import { googleConfigured, sessionConfigured, currentUser } from './_lib/session.js'
-import { databaseConfigured } from './_lib/db.js'
+import { databaseConfigured, publicUser } from './_lib/db.js'
 
 export default handler(async (req, res) => {
   methods(req, ['GET'])
@@ -16,7 +16,7 @@ export default handler(async (req, res) => {
   if (ready.google && ready.database) {
     try {
       const u = await currentUser(req)
-      if (u) user = { id: String(u.id), email: u.email, name: u.name, picture: u.picture, credits: u.credits }
+      if (u) user = publicUser(u)
     } catch { /* signed out or database asleep — treat as logged out */ }
   }
   send(res, 200, {

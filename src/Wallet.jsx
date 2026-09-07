@@ -53,6 +53,9 @@ export function AccountMenu({ user, onBuy, onSignOut }) {
             </p>
           </div>
           <button type="button" onClick={() => { setOpen(false); onBuy() }} className="stamp block w-full px-3 py-2.5 text-left text-[11px] text-paper-2 hover:bg-gold/10">Add credits</button>
+          {user.isAdmin && (
+            <a href="/admin" className="stamp block w-full px-3 py-2.5 text-left text-[11px] text-gold hover:bg-gold/10">The books</a>
+          )}
           <button type="button" onClick={() => { setOpen(false); onSignOut() }} className="stamp block w-full px-3 py-2.5 text-left text-[11px] text-paper-3/70 hover:bg-gold/10">Sign out</button>
         </div>
       )}

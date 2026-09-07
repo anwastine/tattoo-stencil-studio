@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from './api.js'
 import { useSession } from './Auth.jsx'
 import SignIn, { Splash } from './SignIn.jsx'
+import PhonePrompt from './PhonePrompt.jsx'
+import Admin from './Admin.jsx'
 import { CreditTicket, AccountMenu, BuyCreditsModal } from './Wallet.jsx'
 import { startTattooCursor } from './cursors.js'
 
@@ -153,9 +155,11 @@ function Thumb({ bitmap }) {
 /* ------------------------------------------------------------------ */
 
 export default function App() {
-  const { config, user, loading: sessionLoading, refresh, signOut, setCredits } = useSession()
+  const { config, user, setUser, loading: sessionLoading, refresh, signOut, setCredits } = useSession()
   const [showBuy, setShowBuy] = useState(false)
   const [welcome, setWelcome] = useState(null)
+  const [askPhone, setAskPhone] = useState(false)
+  const isAdminRoute = typeof window !== 'undefined' && window.location.pathname.replace(/\/+$/, '') === '/admin'
 
   const [source, setSource] = useState(null)
   const [style, setStyle] = useState('studio')
@@ -179,6 +183,8 @@ export default function App() {
   const fileInputRef = useRef(null)
 
   useEffect(() => startTattooCursor(), [])
+
+  useEffect(() => { if (user?.askPhone) setAskPhone(true) }, [user?.askPhone])
 
   /* ---------------- loading ---------------- */
   const loadFile = useCallback(async (file) => {
@@ -366,6 +372,7 @@ export default function App() {
   // Every hook above has already run, so these early returns are safe.
   if (sessionLoading) return <Splash />
   if (!signedIn) {
+    // /admin still needs a sign-in first; the landing page handles that.
     return (
       <SignIn
         config={config}
@@ -376,6 +383,7 @@ export default function App() {
       />
     )
   }
+  if (isAdminRoute) return <Admin user={user} />
 
   /* ------------------------------------------------------------------ */
 
@@ -619,6 +627,15 @@ export default function App() {
           </div>
         </aside>
       </main>
+
+      {askPhone && (
+        <PhonePrompt
+          onDone={(updated) => {
+            setAskPhone(false)
+            if (updated) setUser(updated)
+          }}
+        />
+      )}
 
       {showBuy && (
         <BuyCreditsModal config={config} user={user} onClose={() => setShowBuy(false)} onCredited={(credits) => setCredits(credits)} />

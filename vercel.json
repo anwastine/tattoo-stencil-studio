@@ -1,5 +1,14 @@
 {
   "functions": {
-    "api/stencil.js": { "maxDuration": 300, "memory": 1024 }
-  }
+    "api/stencil.js": {
+      "maxDuration": 300,
+      "memory": 1024
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/admin",
+      "destination": "/index.html"
+    }
+  ]
 }

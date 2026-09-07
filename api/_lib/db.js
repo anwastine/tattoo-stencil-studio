@@ -47,6 +47,11 @@ export function init() {
         last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now()
       )`
     await sql`CREATE INDEX IF NOT EXISTS users_email_key_idx ON users (email_key)`
+    // Optional mobile number, collected once after sign-up. ADD COLUMN IF NOT
+    // EXISTS keeps this safe on a database that already has rows.
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT`
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_asked BOOLEAN NOT NULL DEFAULT false`
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_at TIMESTAMPTZ`
     // One welcome bonus per real mailbox, not per Google account row.
     await sql`
       CREATE TABLE IF NOT EXISTS welcome_grants (
@@ -146,7 +151,124 @@ export async function getUser(id) {
 }
 
 export const publicUser = (u) =>
-  u && { id: String(u.id), email: u.email, name: u.name, picture: u.picture, credits: u.credits, createdAt: u.created_at }
+  u && {
+    id: String(u.id),
+    email: u.email,
+    name: u.name,
+    picture: u.picture,
+    credits: u.credits,
+    createdAt: u.created_at,
+    phone: u.phone || null,
+    // drives the one-time "join the channel" prompt
+    askPhone: !u.phone && !u.phone_asked,
+    isAdmin: isAdmin(u.email),
+  }
+
+/* ---------------- phone ---------------- */
+
+/**
+ * Indian mobile numbers, stored canonically as +91XXXXXXXXXX.
+ * Accepts 9876543210, 09876543210, +91 98765 43210 and similar.
+ * Returns null when it is not a valid Indian mobile.
+ */
+export function normalisePhone(raw) {
+  const digits = String(raw || '').replace(/[^0-9]/g, '')
+  let local = digits
+  if (local.length === 12 && local.startsWith('91')) local = local.slice(2)
+  else if (local.length === 11 && local.startsWith('0')) local = local.slice(1)
+  if (!/^[6-9][0-9]{9}$/.test(local)) return null
+  return `+91${local}`
+}
+
+export async function savePhone(userId, phone) {
+  await init()
+  const rows = await client()`
+    UPDATE users SET phone = ${phone}, phone_asked = true, phone_at = now()
+     WHERE id = ${userId} RETURNING *`
+  return rows[0] || null
+}
+
+/** They chose "not now" — don't ask again. */
+export async function skipPhone(userId) {
+  await init()
+  const rows = await client()`
+    UPDATE users SET phone_asked = true WHERE id = ${userId} RETURNING *`
+  return rows[0] || null
+}
+
+/* ---------------- admin ---------------- */
+
+/** Admins are listed in ADMIN_EMAILS, comma separated. */
+export function isAdmin(email) {
+  const list = (process.env.ADMIN_EMAILS || '')
+    .split(',')
+    .map((e) => emailKey(e.trim()))
+    .filter(Boolean)
+  if (!list.length || !email) return false
+  return list.includes(emailKey(email))
+}
+
+/** Everyone who has signed up, newest first, with their activity totals. */
+export async function listUsers({ limit = 500, search = '' } = {}) {
+  await init()
+  const sql = client()
+  const like = `%${String(search).trim().toLowerCase()}%`
+  const rows = search
+    ? await sql`
+        SELECT u.id, u.email, u.name, u.phone, u.credits, u.created_at, u.last_seen_at, u.blocked,
+               COALESCE(-SUM(l.credits) FILTER (WHERE l.kind = 'spend'), 0)  AS spent,
+               COALESCE( SUM(l.credits) FILTER (WHERE l.kind = 'purchase'), 0) AS bought
+          FROM users u LEFT JOIN ledger l ON l.user_id = u.id
+         WHERE lower(u.email) LIKE ${like} OR lower(COALESCE(u.name,'')) LIKE ${like} OR COALESCE(u.phone,'') LIKE ${like}
+         GROUP BY u.id ORDER BY u.created_at DESC LIMIT ${limit}`
+    : await sql`
+        SELECT u.id, u.email, u.name, u.phone, u.credits, u.created_at, u.last_seen_at, u.blocked,
+               COALESCE(-SUM(l.credits) FILTER (WHERE l.kind = 'spend'), 0)  AS spent,
+               COALESCE( SUM(l.credits) FILTER (WHERE l.kind = 'purchase'), 0) AS bought
+          FROM users u LEFT JOIN ledger l ON l.user_id = u.id
+         GROUP BY u.id ORDER BY u.created_at DESC LIMIT ${limit}`
+  return rows.map((r) => ({
+    id: String(r.id),
+    email: r.email,
+    name: r.name,
+    phone: r.phone,
+    credits: r.credits,
+    spent: Number(r.spent),
+    bought: Number(r.bought),
+    joined: r.created_at,
+    lastSeen: r.last_seen_at,
+    blocked: r.blocked,
+  }))
+}
+
+export async function adminStats() {
+  await init()
+  const sql = client()
+  const [u] = await sql`
+    SELECT count(*) AS users,
+           count(*) FILTER (WHERE phone IS NOT NULL) AS with_phone,
+           count(*) FILTER (WHERE created_at > now() - interval '7 days') AS new_week,
+           COALESCE(sum(credits), 0) AS credits_held
+      FROM users`
+  const [l] = await sql`
+    SELECT COALESCE(-sum(credits) FILTER (WHERE kind = 'spend'), 0) AS stencils,
+           COALESCE( sum(credits) FILTER (WHERE kind = 'purchase'), 0) AS credits_sold
+      FROM ledger`
+  const [o] = await sql`
+    SELECT COALESCE(sum(amount_paise) FILTER (WHERE status = 'paid'), 0) AS paise,
+           count(*) FILTER (WHERE status = 'paid') AS orders
+      FROM orders`
+  return {
+    users: Number(u.users),
+    withPhone: Number(u.with_phone),
+    newThisWeek: Number(u.new_week),
+    creditsHeld: Number(u.credits_held),
+    stencilsDrawn: Number(l.stencils),
+    creditsSold: Number(l.credits_sold),
+    paidOrders: Number(o.orders),
+    revenueRupees: Number(o.paise) / 100,
+  }
+}
 
 /* ---------------- credits ---------------- */
 

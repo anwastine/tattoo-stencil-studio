@@ -131,6 +131,32 @@ they didn't get.
 
 ---
 
+## The admin panel
+
+**https://tattoo-stencil-studio-kappa.vercel.app/admin** — or "The books" in
+your account menu. Signed-in admins only; everyone else gets turned away.
+
+It lists every artist who has signed up with their email, mobile number
+(where they gave one), credit balance, stencils drawn and credits bought,
+plus totals across the top and a search box. **Export CSV** downloads the
+whole list; **Copy numbers** puts just the mobile numbers on your clipboard
+for a broadcast list.
+
+Admins are whoever is listed in the `ADMIN_EMAILS` environment variable,
+comma separated. It is currently set to anwastine@gmail.com — tell me if you
+want to add someone.
+
+## The mobile number prompt
+
+Right after an artist signs in for the first time, they are asked once for
+their mobile number to join "India's largest tattoo artist channel, opening
+soon". It is genuinely optional: "Not now" dismisses it for good, and either
+way they keep their credits and full use of the studio. Numbers are validated
+as Indian mobiles and stored as +91XXXXXXXXXX.
+
+The privacy policy now states that the number is collected only for the
+channel and can be deleted on request — keep that promise.
+
 ## Once it's live
 
 - **Your own free credits:** you get 29 like everyone else. To give yourself
