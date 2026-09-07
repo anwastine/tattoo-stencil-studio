@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api } from './api.js'
 import { useSession } from './Auth.jsx'
 import SignIn, { Splash } from './SignIn.jsx'
 import PhonePrompt from './PhonePrompt.jsx'
 import Admin from './Admin.jsx'
+import Lettering from './Lettering.jsx'
+import { paintStencil, downloadStencil } from './stencil.js'
 import { CreditTicket, AccountMenu, BuyCreditsModal } from './Wallet.jsx'
 import { startTattooCursor } from './cursors.js'
 
@@ -137,6 +139,43 @@ function Panel({ title, right, children }) {
   )
 }
 
+function FinishPanel({ ink, setInk, bg, setBg, mirror, setMirror, threshold, setThreshold, sizeNote }) {
+  return (
+    <Panel title="Finish">
+      <div>
+        <p className="mb-2 text-[13px] text-paper-2">Ink colour</p>
+        <div className="flex items-center gap-2">
+          {INKS.map((c) => (
+            <button
+              key={c.value}
+              type="button"
+              title={c.name}
+              onClick={() => setInk(c.value)}
+              className={`h-7 w-7 rounded-full border-2 transition ${ink === c.value ? 'border-gold' : 'border-gold/25 hover:border-gold/60'}`}
+              style={{ background: c.value }}
+            />
+          ))}
+          <label className="relative h-7 w-7 overflow-hidden rounded-full border-2 border-gold/25" title="Custom colour">
+            <span className="absolute inset-0" style={{ background: 'conic-gradient(#b3271e,#c9a24a,#5d7a55,#1d3fa3,#5b2a86,#b3271e)' }} />
+            <input type="color" value={ink} onChange={(e) => setInk(e.target.value)} className="absolute inset-0 opacity-0" />
+          </label>
+          <span className="stamp ml-auto text-[11px] text-paper-3/60">{ink}</span>
+        </div>
+      </div>
+      <div>
+        <p className="mb-2 text-[13px] text-paper-2">Background</p>
+        <Segmented value={bg} onChange={setBg} options={[{ value: 'white', label: 'Paper' }, { value: 'transparent', label: 'Transparent' }]} />
+      </div>
+      <Toggle label="Hard black &amp; white" hint="Threshold to solid ink for thermal stencil printers" checked={threshold > 0} onChange={(v) => setThreshold(v ? 0.45 : 0)} />
+      {threshold > 0 && (
+        <Slider label="Ink cut-off" value={threshold} min={0.1} max={0.9} step={0.01} format={(v) => `${Math.round(v * 100)}%`} onChange={setThreshold} hint="Lower keeps faint marks; higher keeps only solid ink." />
+      )}
+      <Toggle label="Mirror" hint="Flip so the stencil reads correctly once it is on skin" checked={mirror} onChange={setMirror} />
+      {sizeNote && <p className="text-[11px] leading-snug text-paper-3/60">{sizeNote}</p>}
+    </Panel>
+  )
+}
+
 function Thumb({ bitmap }) {
   const ref = useRef(null)
   useEffect(() => {
@@ -159,6 +198,7 @@ export default function App() {
   const [showBuy, setShowBuy] = useState(false)
   const [welcome, setWelcome] = useState(null)
   const [askPhone, setAskPhone] = useState(false)
+  const [mode, setMode] = useState('portrait') // portrait | lettering
   const isAdminRoute = typeof window !== 'undefined' && window.location.pathname.replace(/\/+$/, '') === '/admin'
 
   const [source, setSource] = useState(null)
@@ -276,38 +316,8 @@ export default function App() {
   }, [source, busy, style, setCredits, refresh])
 
   /* ---------------- render + export ---------------- */
-  const renderResult = useCallback(
-    (ctx, res) => {
-      const cw = ctx.canvas.width, ch = ctx.canvas.height
-      ctx.save()
-      ctx.setTransform(1, 0, 0, 1, 0, 0)
-      ctx.clearRect(0, 0, cw, ch)
-      if (mirror) { ctx.translate(cw, 0); ctx.scale(-1, 1) }
-      ctx.imageSmoothingQuality = 'high'
-      ctx.drawImage(res.bitmap, 0, 0, cw, ch)
-      ctx.restore()
-      const img = ctx.getImageData(0, 0, cw, ch)
-      const d = img.data
-      const [ir, ig, ib] = hexToRgb(ink)
-      const white = bg === 'white'
-      for (let i = 0; i < d.length; i += 4) {
-        const lum = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]
-        let a = 1 - lum / 255
-        if (threshold > 0) a = a > threshold ? 1 : 0
-        if (white) {
-          d[i] = Math.round(255 + (ir - 255) * a)
-          d[i + 1] = Math.round(255 + (ig - 255) * a)
-          d[i + 2] = Math.round(255 + (ib - 255) * a)
-          d[i + 3] = 255
-        } else {
-          d[i] = ir; d[i + 1] = ig; d[i + 2] = ib
-          d[i + 3] = Math.round(a * 255)
-        }
-      }
-      ctx.putImageData(img, 0, 0)
-    },
-    [ink, bg, mirror, threshold],
-  )
+  const finish = useMemo(() => ({ ink, bg, mirror, threshold }), [ink, bg, mirror, threshold])
+  const renderResult = useCallback((ctx, res) => paintStencil(ctx, res.bitmap, finish), [finish])
 
   useEffect(() => {
     const c = aiCanvasRef.current
@@ -334,20 +344,9 @@ export default function App() {
 
   const exportPNG = useCallback(async () => {
     if (!result) return
-    const c = document.createElement('canvas')
-    c.width = result.w
-    c.height = result.h
-    renderResult(c.getContext('2d', { willReadFrequently: true }), result)
-    const blob = await new Promise((r) => c.toBlob(r, 'image/png'))
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${source?.name || 'portrait'}-stencil-${result.style}${mirror ? '-mirrored' : ''}.png`
-    document.body.appendChild(a)
-    a.click()
-    a.remove()
-    setTimeout(() => URL.revokeObjectURL(url), 2000)
-  }, [result, renderResult, mirror, source])
+    await downloadStencil(result.bitmap, result.w, result.h, finish,
+      `${source?.name || 'portrait'}-stencil-${result.style}${mirror ? '-mirrored' : ''}.png`)
+  }, [result, finish, mirror, source])
 
   const onSplitPointer = (e) => {
     if (view !== 'split' || !result) return
@@ -404,22 +403,52 @@ export default function App() {
             </div>
           </div>
 
+          <div className="mx-2 hidden shrink-0 md:block">
+            <Segmented value={mode} onChange={setMode} options={[{ value: 'portrait', label: 'Portrait' }, { value: 'lettering', label: 'Lettering' }]} />
+          </div>
+
           <div className="flex shrink-0 items-center gap-2">
             <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => loadFile(e.target.files?.[0])} />
             <CreditTicket credits={user.credits} onClick={() => setShowBuy(true)} />
-            <button type="button" onClick={() => fileInputRef.current?.click()} className="btn-quiet hidden rounded-sm px-3 py-2 text-[11px] sm:block">
-              {source ? 'New photo' : 'Upload'}
-            </button>
-            <button type="button" disabled={!result} onClick={exportPNG} className="btn-ink rounded-sm px-3.5 py-2 text-[11px] sm:px-4">
-              Download
-            </button>
+            {mode === 'portrait' && (
+              <>
+                <button type="button" onClick={() => fileInputRef.current?.click()} className="btn-quiet hidden rounded-sm px-3 py-2 text-[11px] sm:block">
+                  {source ? 'New photo' : 'Upload'}
+                </button>
+                <button type="button" disabled={!result} onClick={exportPNG} className="btn-ink rounded-sm px-3.5 py-2 text-[11px] sm:px-4">
+                  Download
+                </button>
+              </>
+            )}
             <AccountMenu user={user} onBuy={() => setShowBuy(true)} onSignOut={signOut} />
           </div>
         </div>
       </header>
 
+      <div className="border-b border-gold/15 px-4 py-2 md:hidden">
+        <Segmented value={mode} onChange={setMode} options={[{ value: 'portrait', label: 'Portrait' }, { value: 'lettering', label: 'Lettering' }]} />
+      </div>
+
       {/* ---------------- body ---------------- */}
       <main className="grid flex-1 grid-cols-1 gap-4 p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_370px] lg:overflow-hidden">
+        {mode === 'lettering' ? (
+          <Lettering
+            user={user}
+            config={config}
+            setCredits={setCredits}
+            refresh={refresh}
+            onNeedCredits={() => setShowBuy(true)}
+            finish={finish}
+            finishPanel={
+              <FinishPanel
+                ink={ink} setInk={setInk} bg={bg} setBg={setBg}
+                mirror={mirror} setMirror={setMirror}
+                threshold={threshold} setThreshold={setThreshold}
+              />
+            }
+          />
+        ) : (
+        <>
         {/* stage */}
         <section
           className={`panel relative flex min-h-[58vh] flex-col overflow-hidden rounded-sm transition lg:h-full lg:min-h-0 ${dragOver ? 'border-red-bright' : ''}`}
@@ -548,45 +577,12 @@ export default function App() {
             </div>
           </section>
 
-          {result && (
-            <Panel title="Prepare for transfer">
-              <Toggle label="Hard black &amp; white" hint="Threshold to solid ink for thermal stencil printers" checked={threshold > 0} onChange={(v) => setThreshold(v ? 0.45 : 0)} />
-              {threshold > 0 && (
-                <Slider label="Ink cut-off" value={threshold} min={0.1} max={0.9} step={0.01} format={(v) => `${Math.round(v * 100)}%`} onChange={setThreshold} hint="Lower keeps faint marks; higher keeps only solid ink." />
-              )}
-              <Toggle label="Mirror" hint="Flip so the stencil reads correctly once it is on skin" checked={mirror} onChange={setMirror} />
-            </Panel>
-          )}
-
-          <Panel title="Finish">
-            <div>
-              <p className="mb-2 text-[13px] text-paper-2">Ink colour</p>
-              <div className="flex items-center gap-2">
-                {INKS.map((c) => (
-                  <button
-                    key={c.value}
-                    type="button"
-                    title={c.name}
-                    onClick={() => setInk(c.value)}
-                    className={`h-7 w-7 rounded-full border-2 transition ${ink === c.value ? 'border-gold' : 'border-gold/25 hover:border-gold/60'}`}
-                    style={{ background: c.value }}
-                  />
-                ))}
-                <label className="relative h-7 w-7 overflow-hidden rounded-full border-2 border-gold/25" title="Custom colour">
-                  <span className="absolute inset-0" style={{ background: 'conic-gradient(#b3271e,#c9a24a,#5d7a55,#1d3fa3,#5b2a86,#b3271e)' }} />
-                  <input type="color" value={ink} onChange={(e) => setInk(e.target.value)} className="absolute inset-0 opacity-0" />
-                </label>
-                <span className="stamp ml-auto text-[11px] text-paper-3/60">{ink}</span>
-              </div>
-            </div>
-            <div>
-              <p className="mb-2 text-[13px] text-paper-2">Background</p>
-              <Segmented value={bg} onChange={setBg} options={[{ value: 'white', label: 'Paper' }, { value: 'transparent', label: 'Transparent' }]} />
-            </div>
-            <p className="text-[11px] leading-snug text-paper-3/60">
-              Download gives you the full-size PNG{result ? ` (${result.w}×${result.h})` : ''}, ready to print or send to a thermal printer.
-            </p>
-          </Panel>
+          <FinishPanel
+            ink={ink} setInk={setInk} bg={bg} setBg={setBg}
+            mirror={mirror} setMirror={setMirror}
+            threshold={threshold} setThreshold={setThreshold}
+            sizeNote={`Download gives you the full-size PNG${result ? ` (${result.w}×${result.h})` : ''}, ready to print or send to a thermal printer.`}
+          />
 
           {history.length > 0 && (
             <Panel title="Earlier draws">
@@ -626,6 +622,8 @@ export default function App() {
             </nav>
           </div>
         </aside>
+        </>
+        )}
       </main>
 
       {askPhone && (
@@ -649,7 +647,7 @@ export default function App() {
         </div>
       )}
 
-      {source && (
+      {mode === 'portrait' && source && (
         <div className="sticky bottom-0 z-10 flex gap-2 border-t border-gold/20 bg-ink/95 p-3 backdrop-blur lg:hidden">
           <button type="button" onClick={() => fileInputRef.current?.click()} className="btn-quiet rounded-sm px-4 py-3 text-[11px]">New</button>
           {result ? (

@@ -19,11 +19,11 @@
  */
 
 import { clientIp } from './_lib/http.js'
+import { models, apiKey, callOpenAI, isModelMissing } from './_lib/openai.js'
 import { requireUser } from './_lib/session.js'
 import { spendCredits, refundCredits, releaseSlot, checkRateLimit } from './_lib/db.js'
 import { creditCostFor } from './_lib/config.js'
 
-const OPENAI_MODELS = [process.env.OPENAI_IMAGE_MODEL, 'gpt-image-2', 'gpt-image-1.5', 'gpt-image-1'].filter(Boolean)
 
 const BASE = `You are a master tattoo artist preparing a transfer stencil from this portrait photo.
 Redraw the photo as a hand-inked tattoo stencil drawing:
@@ -66,60 +66,6 @@ function nearestRatio(w, h) {
   return best
 }
 
-// gpt-image-2 accepts any WxH that is a multiple of 16 within its pixel budget.
-// We always render at the 1K tier: it is the size that keeps a credit profitable.
-function openaiSize(w, h, model) {
-  if (!/gpt-image-2/.test(model)) {
-    // older models: fixed sizes only
-    const r = w / h
-    return r > 1.2 ? '1536x1024' : r < 0.83 ? '1024x1536' : '1024x1024'
-  }
-  const target = 1024
-  const r = w / h
-  let W, H
-  if (r >= 1) { W = target; H = target / r } else { H = target; W = target * r }
-  const snap = (v) => Math.max(256, Math.round(v / 16) * 16)
-  W = snap(W); H = snap(H)
-  // keep within the pixel budget
-  let px = W * H
-  if (px > 8_294_400) { const k = Math.sqrt(8_294_400 / px); W = snap(W * k); H = snap(H * k) }
-  if (px < 655_360) { const k = Math.sqrt(655_360 / px) * 1.01; W = snap(W * k); H = snap(H * k) }
-  return `${W}x${H}`
-}
-
-async function readJson(req) {
-  if (req.body && typeof req.body === 'object') return req.body
-  const chunks = []
-  for await (const c of req) chunks.push(c)
-  const raw = Buffer.concat(chunks).toString('utf8')
-  return raw ? JSON.parse(raw) : {}
-}
-
-const httpError = (msg, status) => Object.assign(new Error(msg), { status })
-const isModelMissing = (e) => e.status === 404 || (e.status === 400 && /model|not found|unsupported|does not exist/i.test(e.message))
-
-/* ---------------- providers ---------------- */
-
-async function callOpenAI({ model, key, prompt, mime, b64, w, h }) {
-  const form = new FormData()
-  form.append('model', model)
-  form.append('prompt', prompt)
-  form.append('image', new Blob([Buffer.from(b64, 'base64')], { type: mime }), mime === 'image/png' ? 'photo.png' : 'photo.jpg')
-  form.append('size', openaiSize(w, h, model))
-  form.append('quality', 'medium')
-  form.append('output_format', 'png')
-  form.append('background', 'opaque')
-  if (!/gpt-image-2/.test(model)) form.append('input_fidelity', 'high')
-  const r = await fetch('https://api.openai.com/v1/images/edits', { method: 'POST', headers: { authorization: `Bearer ${key}` }, body: form })
-  const json = await r.json().catch(() => ({}))
-  if (!r.ok) throw httpError(json?.error?.message || `OpenAI HTTP ${r.status}`, r.status)
-  const data = json?.data?.[0]?.b64_json
-  if (!data) throw httpError('OpenAI returned no image', 502)
-  return { mime: 'image/png', data }
-}
-
-const apiKey = () => process.env.OPENAI_API_KEY
-
 /* ---------------- abuse guard ---------------- */
 
 /*
@@ -146,7 +92,7 @@ export default async function handler(req, res) {
     res.setHeader('cache-control', 'no-store')
     res.end(JSON.stringify(obj))
   }
-  if (req.method === 'GET') return send(200, { ready: !!apiKey(), model: OPENAI_MODELS[0] })
+  if (req.method === 'GET') return send(200, { ready: !!apiKey(), model: models()[0] })
   if (req.method !== 'POST') return send(405, { error: 'POST only' })
 
   if (!apiKey()) return send(503, { error: 'The drawing service is not configured. Add OPENAI_API_KEY in Vercel → Settings → Environment Variables, then redeploy.' })
@@ -196,7 +142,7 @@ export default async function handler(req, res) {
   /* --- draw; give the credit back if the model fails --- */
   const t0 = Date.now()
   let lastErr
-  for (const model of [...new Set(OPENAI_MODELS)]) {
+  for (const model of models()) {
     try {
       const out = await callOpenAI({ model, key: apiKey(), prompt, mime, b64, w, h })
       await releaseSlot(user.id)
