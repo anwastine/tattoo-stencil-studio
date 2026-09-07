@@ -1,9 +1,9 @@
 /*
- * GET  /api/stencil            → { providers: ["gemini", "openai"], defaults }
+ * GET  /api/stencil            → { ready, model }
  * POST /api/stencil
- *   Body: { image: "data:image/jpeg;base64,...", provider?: "gemini" | "openai",
+ *   Body: { image: "data:image/jpeg;base64,...",
  *           style: "studio" | "fineline" | "bold" | "dotwork" | "realism",
- *           size?: "1K" | "2K" | "4K", width, height }
+ *           width, height }
  *   Returns: { image: "data:image/png;base64,...", provider, model, ms, credits }
  *
  * Requires a signed-in user and spends credits (see _lib/config.js). The credit
@@ -13,11 +13,9 @@
  * and returns the redrawn image. Runs as a Vercel serverless function; also
  * mounted by vite.config.js for local dev.
  *
- * Environment (set at least one):
+ * Environment:
  *   OPENAI_API_KEY      https://platform.openai.com/api-keys
  *   OPENAI_IMAGE_MODEL  optional, default gpt-image-2 (falls back to gpt-image-1.5, gpt-image-1)
- *   GEMINI_API_KEY      https://aistudio.google.com/apikey
- *   GEMINI_IMAGE_MODEL  optional, default gemini-3.1-flash-image
  */
 
 import { clientIp } from './_lib/http.js'
@@ -25,7 +23,6 @@ import { requireUser } from './_lib/session.js'
 import { spendCredits, refundCredits, releaseSlot, checkRateLimit } from './_lib/db.js'
 import { creditCostFor } from './_lib/config.js'
 
-const GEMINI_MODELS = [process.env.GEMINI_IMAGE_MODEL, 'gemini-3.1-flash-image', 'gemini-2.5-flash-image'].filter(Boolean)
 const OPENAI_MODELS = [process.env.OPENAI_IMAGE_MODEL, 'gpt-image-2', 'gpt-image-1.5', 'gpt-image-1'].filter(Boolean)
 
 const BASE = `You are a master tattoo artist preparing a transfer stencil from this portrait photo.
@@ -69,14 +66,15 @@ function nearestRatio(w, h) {
   return best
 }
 
-// OpenAI gpt-image-2: any WxH, multiples of 16, ≤3840 edge, 655,360..8,294,400 px
-function openaiSize(w, h, size, model) {
+// gpt-image-2 accepts any WxH that is a multiple of 16 within its pixel budget.
+// We always render at the 1K tier: it is the size that keeps a credit profitable.
+function openaiSize(w, h, model) {
   if (!/gpt-image-2/.test(model)) {
     // older models: fixed sizes only
     const r = w / h
     return r > 1.2 ? '1536x1024' : r < 0.83 ? '1024x1536' : '1024x1024'
   }
-  const target = size === '4K' ? 3840 : size === '2K' ? 2048 : 1024
+  const target = 1024
   const r = w / h
   let W, H
   if (r >= 1) { W = target; H = target / r } else { H = target; W = target * r }
@@ -102,32 +100,13 @@ const isModelMissing = (e) => e.status === 404 || (e.status === 400 && /model|no
 
 /* ---------------- providers ---------------- */
 
-async function callGemini({ model, key, prompt, mime, b64, w, h, size }) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
-  const body = {
-    contents: [{ role: 'user', parts: [{ text: prompt }, { inlineData: { mimeType: mime, data: b64 } }] }],
-    generationConfig: { responseModalities: ['IMAGE'], imageConfig: { aspectRatio: nearestRatio(w, h), imageSize: size } },
-  }
-  const r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': key }, body: JSON.stringify(body) })
-  const json = await r.json().catch(() => ({}))
-  if (!r.ok) throw httpError(json?.error?.message || `Gemini HTTP ${r.status}`, r.status)
-  const parts = json?.candidates?.[0]?.content?.parts || []
-  const img = parts.find((p) => p.inlineData?.data)
-  if (!img) {
-    const reason = json?.candidates?.[0]?.finishReason || json?.promptFeedback?.blockReason
-    const text = parts.find((p) => p.text)?.text
-    throw httpError(`Gemini returned no image${reason ? ` (${reason})` : ''}${text ? `: ${text.slice(0, 200)}` : ''}`, 502)
-  }
-  return { mime: img.inlineData.mimeType || 'image/png', data: img.inlineData.data }
-}
-
-async function callOpenAI({ model, key, prompt, mime, b64, w, h, size }) {
+async function callOpenAI({ model, key, prompt, mime, b64, w, h }) {
   const form = new FormData()
   form.append('model', model)
   form.append('prompt', prompt)
   form.append('image', new Blob([Buffer.from(b64, 'base64')], { type: mime }), mime === 'image/png' ? 'photo.png' : 'photo.jpg')
-  form.append('size', openaiSize(w, h, size, model))
-  form.append('quality', size === '1K' ? 'medium' : 'high')
+  form.append('size', openaiSize(w, h, model))
+  form.append('quality', 'medium')
   form.append('output_format', 'png')
   form.append('background', 'opaque')
   if (!/gpt-image-2/.test(model)) form.append('input_fidelity', 'high')
@@ -139,11 +118,7 @@ async function callOpenAI({ model, key, prompt, mime, b64, w, h, size }) {
   return { mime: 'image/png', data }
 }
 
-const PROVIDERS = {
-  openai: { key: () => process.env.OPENAI_API_KEY, models: OPENAI_MODELS, call: callOpenAI },
-  gemini: { key: () => process.env.GEMINI_API_KEY, models: GEMINI_MODELS, call: callGemini },
-}
-const available = () => Object.keys(PROVIDERS).filter((k) => PROVIDERS[k].key())
+const apiKey = () => process.env.OPENAI_API_KEY
 
 /* ---------------- abuse guard ---------------- */
 
@@ -171,11 +146,10 @@ export default async function handler(req, res) {
     res.setHeader('cache-control', 'no-store')
     res.end(JSON.stringify(obj))
   }
-  if (req.method === 'GET') return send(200, { providers: available(), models: { openai: OPENAI_MODELS[0], gemini: GEMINI_MODELS[0] } })
+  if (req.method === 'GET') return send(200, { ready: !!apiKey(), model: OPENAI_MODELS[0] })
   if (req.method !== 'POST') return send(405, { error: 'POST only' })
 
-  const avail = available()
-  if (!avail.length) return send(503, { error: 'No AI provider configured. Add OPENAI_API_KEY or GEMINI_API_KEY in Vercel → Project → Settings → Environment Variables, then redeploy.' })
+  if (!apiKey()) return send(503, { error: 'The drawing service is not configured. Add OPENAI_API_KEY in Vercel → Settings → Environment Variables, then redeploy.' })
 
   // Reject obvious floods before touching the session or the database.
   if (!burstOk(clientIp(req))) return send(429, { error: 'Too many requests. Please slow down.' })
@@ -190,9 +164,7 @@ export default async function handler(req, res) {
 
   let body
   try { body = await readJson(req) } catch { return send(400, { error: 'Invalid JSON' }) }
-  const { image, style = 'studio', size = '2K', width, height } = body || {}
-  let { provider } = body || {}
-  if (!provider || !PROVIDERS[provider]) provider = avail[0]
+  const { image, style = 'studio', width, height } = body || {}
 
   if (typeof image !== 'string' || !image.startsWith('data:image/')) return send(400, { error: 'image must be a data URL' })
   const m = image.match(/^data:(image\/[a-z]+);base64,(.+)$/i)
@@ -200,18 +172,17 @@ export default async function handler(req, res) {
   const [, mime, b64] = m
   if (b64.length > 6_000_000) return send(413, { error: 'Image too large; send ≤ ~4 MB' })
   const prompt = STYLES[style] || STYLES.studio
-  const sz = size === '1K' || size === '2K' || size === '4K' ? size : '2K'
   const w = Number(width) || 3, h = Number(height) || 4
-  const cost = creditCostFor(sz)
+  const cost = creditCostFor()
 
   const rate = await checkRateLimit(user.id)
   if (!rate.ok) return send(429, { error: rate.reason, credits: user.credits })
 
-  const spend = await spendCredits(user.id, cost, { style, size: sz, provider })
+  const spend = await spendCredits(user.id, cost, { style })
   if (!spend.ok) {
     if (spend.reason === 'insufficient') {
       return send(402, {
-        error: `You need ${cost} credit${cost > 1 ? 's' : ''} for a ${sz} stencil but have ${spend.credits}. Top up your wallet to keep going.`,
+        error: `You are out of credits. Top up your wallet to keep drawing.`,
         credits: spend.credits,
         needCredits: cost,
         rechargeRequired: true,
@@ -222,17 +193,15 @@ export default async function handler(req, res) {
     return send(400, { error: 'Could not start the generation.' })
   }
 
-  /* --- generate; give the credit back if the model fails --- */
-  const P = PROVIDERS[provider]
+  /* --- draw; give the credit back if the model fails --- */
   const t0 = Date.now()
   let lastErr
-  for (const model of [...new Set(P.models)]) {
+  for (const model of [...new Set(OPENAI_MODELS)]) {
     try {
-      const out = await P.call({ model, key: P.key(), prompt, mime, b64, w, h, size: sz })
+      const out = await callOpenAI({ model, key: apiKey(), prompt, mime, b64, w, h })
       await releaseSlot(user.id)
       return send(200, {
         image: `data:${out.mime};base64,${out.data}`,
-        provider,
         model,
         ms: Date.now() - t0,
         credits: spend.credits,
@@ -243,7 +212,7 @@ export default async function handler(req, res) {
       if (!isModelMissing(e)) break // only fall through when this model is unavailable
     }
   }
-  const credits = await refundCredits(user.id, cost, { reason: 'generation_failed', style, size: sz, provider })
+  const credits = await refundCredits(user.id, cost, { reason: 'generation_failed', style })
   const status = lastErr?.status >= 400 && lastErr.status < 600 ? lastErr.status : 502
-  return send(status, { error: `${lastErr?.message || 'Generation failed'} — your credit was not charged.`, credits, refunded: cost })
+  return send(status, { error: `${lastErr?.message || 'The drawing failed'} — your credit was not charged.`, credits, refunded: cost })
 }

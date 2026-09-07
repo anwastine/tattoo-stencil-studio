@@ -19,8 +19,13 @@ Live: https://tattoo-stencil-studio-kappa.vercel.app
 - **Wallet top-up** via Razorpay (UPI, cards, net banking, wallets). Crediting
   is idempotent: the browser callback and the webhook can both fire and the
   order is still only credited once.
-- **Five stencil styles**, 1K/2K/4K output, hard black-and-white clean-up, ink
-  colour, transparent background, mirror for transfer, full-size PNG export.
+- **Five stencil styles**, hard black-and-white clean-up, ink colour,
+  transparent background, mirror for transfer, full-size PNG export.
+- **Flash-sheet interface** built for tattoo artists: blackletter wordmark,
+  ink-and-bone palette, cream paper stage with registration corners, and a
+  cursor that cycles through ten hand-drawn flash motifs (dagger, rose,
+  swallow, snake, anchor, star, heart, eye, skull, arrow), with a tattoo pen
+  for anything clickable.
 
 ## Setup
 
@@ -31,7 +36,6 @@ environments), then **Deployments → Redeploy**.
 | Variable | Needed for | Where to get it |
 | --- | --- | --- |
 | `OPENAI_API_KEY` | generating | https://platform.openai.com/api-keys |
-| `GEMINI_API_KEY` | alternative model | https://aistudio.google.com/apikey |
 | `GOOGLE_CLIENT_ID` | sign-in | Google Cloud Console (below) |
 | `SESSION_SECRET` | sign-in | `openssl rand -hex 32` |
 | `DATABASE_URL` | accounts + credits | injected by Vercel → Storage → Neon |
@@ -76,16 +80,11 @@ tables create themselves on first use — there is no migration to run.
 ## Prices and margin
 
 `api/_lib/config.js` holds every business number in one place — welcome
-credits, rupees per credit, packs, credit cost per size, rate limits.
+credits, rupees per credit, packs, credit cost, rate limits.
 
-⚠️ At ₹9 a credit (≈$0.10) a 2K render costs roughly $0.30–0.45 and 4K more, so
-**2K and 4K currently sell below cost**. To fix, edit one line:
-
-```js
-export const CREDIT_COST = { '1K': 1, '2K': 4, '4K': 8 }
-```
-
-The UI reads it from the server, so nothing else needs changing.
+Output is fixed at the 1K tier, which costs roughly ₹5–7 per render against ₹9
+of revenue. Adding a larger output size would sell below cost at ₹9, so raise
+`RUPEES_PER_CREDIT` or charge more credits per stencil before doing it.
 
 ## Run locally
 
@@ -102,7 +101,7 @@ sign-in, credits and payments all work locally.
 
 ```
 api/
-  _lib/config.js       welcome credits, price, packs, limits
+  _lib/config.js       welcome credits, price, packs, output size, limits
   _lib/db.js           Neon Postgres: users, ledger, orders, atomic spend
   _lib/session.js      Google ID-token verification + session cookie
   _lib/http.js         request/response helpers, log redaction
@@ -112,12 +111,13 @@ api/
   payments/create-order.js  POST — create a Razorpay order
   payments/verify.js        POST — verify signature + capture, add credits
   payments/webhook.js       POST — server-to-server safety net
-  stencil.js           POST — spend a credit and generate (refunds on failure)
+  stencil.js           POST — spend a credit and draw (refunds on failure)
   config.js            GET  — public config + current user
 src/
   App.jsx              the whole UI
   Auth.jsx             Google button + session hook
-  Wallet.jsx           credit pill, account menu, recharge dialog
+  Wallet.jsx           credit ticket, account menu, recharge dialog
+  cursors.js           the hand-drawn tattoo cursors
   api.js               fetch wrapper + script loader
 public/legal/          terms, privacy, refunds, delivery, pricing, contact
 ```

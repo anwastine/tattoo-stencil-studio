@@ -8,7 +8,7 @@ const GSI = 'https://accounts.google.com/gsi/client'
  * token, which our server verifies before creating a session — the browser is
  * never trusted with who it says it is.
  */
-export function GoogleSignIn({ clientId, onSignedIn, theme = 'filled_black', width = 280 }) {
+export function GoogleSignIn({ clientId, onSignedIn, theme = 'filled_black', width = 250 }) {
   const holder = useRef(null)
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -63,8 +63,8 @@ export function GoogleSignIn({ clientId, onSignedIn, theme = 'filled_black', wid
 
   if (!clientId) {
     return (
-      <p className="rounded-md bg-red-900/40 px-3 py-2 text-[11px] leading-snug text-red-200">
-        Sign-in is not configured yet. Add GOOGLE_CLIENT_ID and SESSION_SECRET in Vercel → Settings → Environment Variables, then redeploy.
+      <p className="rounded-sm border border-red/50 bg-red/15 px-3 py-2 text-left text-[11px] leading-snug text-paper-2">
+        Sign-in is not switched on yet. Add GOOGLE_CLIENT_ID and SESSION_SECRET in Vercel → Settings → Environment Variables, then redeploy.
       </p>
     )
   }
@@ -72,8 +72,8 @@ export function GoogleSignIn({ clientId, onSignedIn, theme = 'filled_black', wid
   return (
     <div className="flex flex-col items-center gap-2">
       <div ref={holder} className={busy ? 'pointer-events-none opacity-50' : ''} />
-      {busy && <p className="text-[11px] text-neutral-400">Signing you in…</p>}
-      {error && <p className="max-w-xs rounded-md bg-red-900/40 px-3 py-2 text-center text-[11px] leading-snug text-red-200">{error}</p>}
+      {busy && <p className="stamp text-[10px] text-gold">Signing you in…</p>}
+      {error && <p className="max-w-xs rounded-sm border border-red/50 bg-red/15 px-3 py-2 text-center text-[11px] leading-snug text-paper-2">{error}</p>}
     </div>
   )
 }

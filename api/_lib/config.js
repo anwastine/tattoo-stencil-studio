@@ -10,17 +10,14 @@ export const WELCOME_CREDITS = 29
 export const RUPEES_PER_CREDIT = 9
 
 /**
- * Credits burned per generation, by output size.
- *
- * NOTE ON MARGIN: at ₹9 a credit, one credit ≈ US$0.10, but a 2K render costs
- * roughly $0.30–0.45 and a 4K render more, so 2K and 4K currently sell below
- * cost. To make every size profitable, change this to:
- *     export const CREDIT_COST = { '1K': 1, '2K': 4, '4K': 8 }
- * The UI picks the numbers up automatically — nothing else needs editing.
+ * Credits burned per generation. One size, one credit.
+ * A 1K render costs roughly $0.05-0.08 against ₹9 (~$0.10) of revenue, so this
+ * stays profitable. Raise RUPEES_PER_CREDIT before adding larger output sizes.
  */
-export const CREDIT_COST = { '1K': 1, '2K': 1, '4K': 1 }
+export const OUTPUT_SIZE = '1K'
+export const CREDIT_COST = { '1K': 1 }
 
-export const creditCostFor = (size) => CREDIT_COST[size] ?? 1
+export const creditCostFor = () => CREDIT_COST[OUTPUT_SIZE]
 
 /** Recharge packs. Straight ₹9 per credit, no bonus, so the maths stays obvious. */
 export const PACKS = [
@@ -46,5 +43,7 @@ export const publicConfig = () => ({
   welcomeCredits: WELCOME_CREDITS,
   rupeesPerCredit: RUPEES_PER_CREDIT,
   creditCost: CREDIT_COST,
+  outputSize: OUTPUT_SIZE,
+  creditsPerStencil: CREDIT_COST[OUTPUT_SIZE],
   packs: PACKS.map((p) => ({ ...p, rupees: p.credits * RUPEES_PER_CREDIT })),
 })

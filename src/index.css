@@ -1,69 +1,199 @@
 @import "tailwindcss";
 
+/* ------------------------------------------------------------------ */
+/*  Flash-sheet palette: ink-black studio wall, bone paper, traditional */
+/*  tattoo red and antique gold.                                       */
+/* ------------------------------------------------------------------ */
+
 @theme {
-  --color-accent: #f5c542;
-  --color-accent-dim: #b8922b;
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-display: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --color-ink: #0b0a09;
+  --color-ink-2: #14110d;
+  --color-ink-3: #1d1913;
+  --color-ink-4: #2a241b;
+  --color-paper: #f4ead6;
+  --color-paper-2: #e3d6ba;
+  --color-paper-3: #b8a888;
+  --color-red: #b3271e;
+  --color-red-bright: #d8483b;
+  --color-gold: #c9a24a;
+  --color-gold-bright: #e7c377;
+  --color-sage: #5d7a55;
+
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Pirata One", "Iowan Old Style", Palatino, Georgia, serif;
+  --font-stamp: "Bebas Neue", "Haettenschweiler", "Arial Narrow", sans-serif;
 }
 
 html, body, #root { height: 100%; }
-body { overscroll-behavior: none; }
 
-/* checkerboard for transparent previews */
-.checker {
-  background-color: #1a1a1a;
+body {
+  overscroll-behavior: none;
+  background-color: var(--color-ink);
+  color: var(--color-paper);
+  /* faint halftone dots + a vignette, so the wall has depth */
   background-image:
-    linear-gradient(45deg, #242424 25%, transparent 25%),
-    linear-gradient(-45deg, #242424 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, #242424 75%),
-    linear-gradient(-45deg, transparent 75%, #242424 75%);
-  background-size: 20px 20px;
-  background-position: 0 0, 0 10px, 10px -10px, -10px 0;
+    radial-gradient(circle at 50% 0%, rgba(201, 162, 74, 0.07), transparent 60%),
+    radial-gradient(rgba(244, 234, 214, 0.045) 1px, transparent 1px);
+  background-size: 100% 100%, 14px 14px;
+  background-attachment: fixed;
 }
 
-/* range sliders */
+/* ---------- signature tattoo cursors ---------- */
+
+@media (pointer: fine) {
+  body { cursor: var(--tattoo-cursor, auto); }
+  button, a, label, summary, [role="button"], input[type="file"],
+  input[type="color"], select, .clickable {
+    cursor: var(--machine-cursor, pointer);
+  }
+  button:disabled, [aria-disabled="true"] { cursor: not-allowed; }
+  input[type="text"], input[type="email"], input[type="number"], textarea { cursor: text; }
+}
+
+/* ---------- paper & ink surfaces ---------- */
+
+/* Cream flash paper with a soft grain and a warm edge burn. */
+.flash-paper {
+  background-color: var(--color-paper);
+  background-image:
+    radial-gradient(ellipse at 50% 50%, rgba(0, 0, 0, 0) 55%, rgba(120, 90, 45, 0.13) 100%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.055'/%3E%3C/svg%3E");
+  box-shadow: 0 22px 60px -18px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(0, 0, 0, 0.55);
+}
+
+/* A panel that reads like dark leather with a hairline gold keyline. */
+.panel {
+  background-color: var(--color-ink-2);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  border: 1px solid rgba(201, 162, 74, 0.22);
+  box-shadow: inset 0 1px 0 rgba(244, 234, 214, 0.05);
+}
+
+/* Double keyline, the way flash sheets are framed. */
+.rule-double {
+  border: 1px solid rgba(201, 162, 74, 0.5);
+  outline: 1px solid rgba(201, 162, 74, 0.25);
+  outline-offset: 3px;
+}
+
+/* ---------- type ---------- */
+
+.stamp {
+  font-family: var(--font-stamp);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.wordmark {
+  font-family: var(--font-display);
+  letter-spacing: 0.01em;
+  line-height: 0.95;
+}
+
+/* Ornamental divider: hairline, diamond, hairline. */
+.ornament {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: rgba(201, 162, 74, 0.55);
+}
+.ornament::before, .ornament::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(to right, transparent, currentColor, transparent);
+}
+
+/* ---------- controls ---------- */
+
+.btn-ink {
+  font-family: var(--font-stamp);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  background: linear-gradient(180deg, var(--color-red-bright), var(--color-red));
+  color: var(--color-paper);
+  border: 1px solid rgba(0, 0, 0, 0.55);
+  box-shadow:
+    0 0 0 1px rgba(232, 195, 119, 0.35),
+    0 6px 18px -6px rgba(216, 72, 59, 0.65),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  transition: transform .1s ease, filter .15s ease;
+}
+.btn-ink:hover:not(:disabled) { filter: brightness(1.09); }
+.btn-ink:active:not(:disabled) { transform: translateY(1px); }
+.btn-ink:disabled { filter: grayscale(.65) brightness(.6); box-shadow: none; }
+
+.btn-quiet {
+  font-family: var(--font-stamp);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  border: 1px solid rgba(201, 162, 74, 0.35);
+  color: var(--color-paper-2);
+  transition: border-color .15s ease, color .15s ease, background-color .15s ease;
+}
+.btn-quiet:hover { border-color: var(--color-gold); color: var(--color-paper); background: rgba(201, 162, 74, 0.08); }
+
+/* Flash card for the style picker. */
+.flash-card {
+  position: relative;
+  border: 1px solid rgba(201, 162, 74, 0.2);
+  background: linear-gradient(180deg, rgba(42, 36, 27, 0.55), rgba(20, 17, 13, 0.55));
+  transition: border-color .15s ease, background-color .15s ease, transform .1s ease;
+}
+.flash-card:hover { border-color: rgba(201, 162, 74, 0.55); }
+.flash-card[data-on="true"] {
+  border-color: var(--color-red-bright);
+  background: linear-gradient(180deg, rgba(179, 39, 30, 0.28), rgba(20, 17, 13, 0.6));
+  box-shadow: inset 0 0 0 1px rgba(232, 195, 119, 0.25);
+}
+
+/* ---------- misc ---------- */
+
+.checker {
+  background-color: #efe6d2;
+  background-image:
+    linear-gradient(45deg, #d6c9ac 25%, transparent 25%),
+    linear-gradient(-45deg, #d6c9ac 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #d6c9ac 75%),
+    linear-gradient(-45deg, transparent 75%, #d6c9ac 75%);
+  background-size: 18px 18px;
+  background-position: 0 0, 0 9px, 9px -9px, -9px 0;
+}
+
 input[type="range"].range {
-  -webkit-appearance: none;
-  appearance: none;
-  height: 22px;
-  background: transparent;
-  cursor: pointer;
-  touch-action: pan-y;
+  -webkit-appearance: none; appearance: none;
+  height: 22px; background: transparent; touch-action: pan-y;
 }
 input[type="range"].range::-webkit-slider-runnable-track {
-  height: 4px;
-  border-radius: 999px;
-  background: linear-gradient(to right, var(--color-accent) 0 var(--fill, 50%), #3a3a3a var(--fill, 50%) 100%);
+  height: 3px;
+  background: linear-gradient(to right, var(--color-red-bright) 0 var(--fill, 50%), rgba(201,162,74,.25) var(--fill, 50%) 100%);
 }
-input[type="range"].range::-moz-range-track {
-  height: 4px; border-radius: 999px; background: #3a3a3a;
-}
-input[type="range"].range::-moz-range-progress {
-  height: 4px; border-radius: 999px; background: var(--color-accent);
-}
+input[type="range"].range::-moz-range-track { height: 3px; background: rgba(201,162,74,.25); }
+input[type="range"].range::-moz-range-progress { height: 3px; background: var(--color-red-bright); }
 input[type="range"].range::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 16px; height: 16px; margin-top: -6px;
-  border-radius: 999px;
-  background: #fafafa;
-  border: 2px solid var(--color-accent);
-  box-shadow: 0 1px 4px rgba(0,0,0,.6);
-  transition: transform .12s ease;
+  -webkit-appearance: none; appearance: none;
+  width: 15px; height: 15px; margin-top: -6px;
+  border-radius: 999px; background: var(--color-paper);
+  border: 2px solid var(--color-red-bright);
+  box-shadow: 0 1px 5px rgba(0,0,0,.7);
 }
 input[type="range"].range::-moz-range-thumb {
-  width: 14px; height: 14px; border-radius: 999px;
-  background: #fafafa; border: 2px solid var(--color-accent);
+  width: 13px; height: 13px; border-radius: 999px;
+  background: var(--color-paper); border: 2px solid var(--color-red-bright);
 }
-input[type="range"].range:active::-webkit-slider-thumb { transform: scale(1.2); }
 
-.scrollbar-thin::-webkit-scrollbar { width: 8px; }
-.scrollbar-thin::-webkit-scrollbar-thumb { background: #333; border-radius: 8px; }
+.scrollbar-thin::-webkit-scrollbar { width: 9px; }
+.scrollbar-thin::-webkit-scrollbar-track { background: rgba(0,0,0,.3); }
+.scrollbar-thin::-webkit-scrollbar-thumb { background: var(--color-ink-4); border-radius: 9px; }
+.scrollbar-thin::-webkit-scrollbar-thumb:hover { background: rgba(201,162,74,.4); }
 
-@keyframes shimmer { 0% { background-position: -200% 0 } 100% { background-position: 200% 0 } }
-.shimmer {
-  background: linear-gradient(90deg, #262626 25%, #3a3a3a 50%, #262626 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.2s linear infinite;
+/* Needle bobbing while the machine runs. */
+@keyframes needle { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(5px) } }
+.needle { animation: needle .55s ease-in-out infinite; }
+
+@keyframes inkpulse { 0%, 100% { opacity: .35 } 50% { opacity: 1 } }
+.inkpulse { animation: inkpulse 1.3s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .needle, .inkpulse { animation: none; }
 }
