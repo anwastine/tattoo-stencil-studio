@@ -4,7 +4,10 @@
  *   Body: { image: "data:image/jpeg;base64,...", provider?: "gemini" | "openai",
  *           style: "studio" | "fineline" | "bold" | "dotwork" | "realism",
  *           size?: "1K" | "2K" | "4K", width, height }
- *   Returns: { image: "data:image/png;base64,...", provider, model, ms }
+ *   Returns: { image: "data:image/png;base64,...", provider, model, ms, credits }
+ *
+ * Requires a signed-in user and spends credits (see _lib/config.js). The credit
+ * is refunded automatically if the model fails.
  *
  * Sends the portrait to an image-to-image model with a tattoo-stencil prompt
  * and returns the redrawn image. Runs as a Vercel serverless function; also
@@ -16,6 +19,11 @@
  *   GEMINI_API_KEY      https://aistudio.google.com/apikey
  *   GEMINI_IMAGE_MODEL  optional, default gemini-3.1-flash-image
  */
+
+import { clientIp } from './_lib/http.js'
+import { requireUser } from './_lib/session.js'
+import { spendCredits, refundCredits, releaseSlot, checkRateLimit } from './_lib/db.js'
+import { creditCostFor } from './_lib/config.js'
 
 const GEMINI_MODELS = [process.env.GEMINI_IMAGE_MODEL, 'gemini-3.1-flash-image', 'gemini-2.5-flash-image'].filter(Boolean)
 const OPENAI_MODELS = [process.env.OPENAI_IMAGE_MODEL, 'gpt-image-2', 'gpt-image-1.5', 'gpt-image-1'].filter(Boolean)
@@ -137,6 +145,23 @@ const PROVIDERS = {
 }
 const available = () => Object.keys(PROVIDERS).filter((k) => PROVIDERS[k].key())
 
+/* ---------------- abuse guard ---------------- */
+
+/*
+ * Per-instance burst limiter. It resets on cold start, so it is a cheap first
+ * line only — the real limits are the per-user ledger checks in _lib/db.js.
+ * The point is to reject a flood before it costs a database round trip.
+ */
+const burst = new Map()
+function burstOk(key, limit = 6, windowMs = 60_000) {
+  const now = Date.now()
+  const hits = (burst.get(key) || []).filter((t) => now - t < windowMs)
+  hits.push(now)
+  burst.set(key, hits)
+  if (burst.size > 5000) burst.clear() // bound memory on a long-lived instance
+  return hits.length <= limit
+}
+
 /* ---------------- handler ---------------- */
 
 export default async function handler(req, res) {
@@ -149,14 +174,25 @@ export default async function handler(req, res) {
   if (req.method === 'GET') return send(200, { providers: available(), models: { openai: OPENAI_MODELS[0], gemini: GEMINI_MODELS[0] } })
   if (req.method !== 'POST') return send(405, { error: 'POST only' })
 
+  const avail = available()
+  if (!avail.length) return send(503, { error: 'No AI provider configured. Add OPENAI_API_KEY or GEMINI_API_KEY in Vercel → Project → Settings → Environment Variables, then redeploy.' })
+
+  // Reject obvious floods before touching the session or the database.
+  if (!burstOk(clientIp(req))) return send(429, { error: 'Too many requests. Please slow down.' })
+
+  /* --- who is asking, and can they afford it --- */
+  let user
+  try {
+    user = await requireUser(req)
+  } catch (e) {
+    return send(e.status || 401, { error: e.message, signInRequired: true })
+  }
+
   let body
   try { body = await readJson(req) } catch { return send(400, { error: 'Invalid JSON' }) }
   const { image, style = 'studio', size = '2K', width, height } = body || {}
   let { provider } = body || {}
-  const avail = available()
-  if (!avail.length) return send(503, { error: 'No AI provider configured. Add OPENAI_API_KEY or GEMINI_API_KEY in Vercel → Project → Settings → Environment Variables, then redeploy.' })
   if (!provider || !PROVIDERS[provider]) provider = avail[0]
-  if (!PROVIDERS[provider].key()) return send(503, { error: `${provider === 'openai' ? 'OPENAI_API_KEY' : 'GEMINI_API_KEY'} is not set on the server. Available: ${avail.join(', ')}.` })
 
   if (typeof image !== 'string' || !image.startsWith('data:image/')) return send(400, { error: 'image must be a data URL' })
   const m = image.match(/^data:(image\/[a-z]+);base64,(.+)$/i)
@@ -166,19 +202,48 @@ export default async function handler(req, res) {
   const prompt = STYLES[style] || STYLES.studio
   const sz = size === '1K' || size === '2K' || size === '4K' ? size : '2K'
   const w = Number(width) || 3, h = Number(height) || 4
+  const cost = creditCostFor(sz)
 
+  const rate = await checkRateLimit(user.id)
+  if (!rate.ok) return send(429, { error: rate.reason, credits: user.credits })
+
+  const spend = await spendCredits(user.id, cost, { style, size: sz, provider })
+  if (!spend.ok) {
+    if (spend.reason === 'insufficient') {
+      return send(402, {
+        error: `You need ${cost} credit${cost > 1 ? 's' : ''} for a ${sz} stencil but have ${spend.credits}. Top up your wallet to keep going.`,
+        credits: spend.credits,
+        needCredits: cost,
+        rechargeRequired: true,
+      })
+    }
+    if (spend.reason === 'busy') return send(429, { error: 'A stencil is already being drawn on this account. Wait for it to finish.', credits: spend.credits })
+    if (spend.reason === 'blocked') return send(403, { error: 'This account has been suspended.' })
+    return send(400, { error: 'Could not start the generation.' })
+  }
+
+  /* --- generate; give the credit back if the model fails --- */
   const P = PROVIDERS[provider]
   const t0 = Date.now()
   let lastErr
   for (const model of [...new Set(P.models)]) {
     try {
       const out = await P.call({ model, key: P.key(), prompt, mime, b64, w, h, size: sz })
-      return send(200, { image: `data:${out.mime};base64,${out.data}`, provider, model, ms: Date.now() - t0 })
+      await releaseSlot(user.id)
+      return send(200, {
+        image: `data:${out.mime};base64,${out.data}`,
+        provider,
+        model,
+        ms: Date.now() - t0,
+        credits: spend.credits,
+        creditsUsed: cost,
+      })
     } catch (e) {
       lastErr = e
       if (!isModelMissing(e)) break // only fall through when this model is unavailable
     }
   }
+  const credits = await refundCredits(user.id, cost, { reason: 'generation_failed', style, size: sz, provider })
   const status = lastErr?.status >= 400 && lastErr.status < 600 ? lastErr.status : 502
-  return send(status, { error: lastErr?.message || 'Generation failed' })
+  return send(status, { error: `${lastErr?.message || 'Generation failed'} — your credit was not charged.`, credits, refunded: cost })
 }

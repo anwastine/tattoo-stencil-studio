@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { api } from './api.js'
+import { GoogleSignIn, useSession } from './Auth.jsx'
+import { CreditPill, AccountMenu, BuyCreditsModal } from './Wallet.jsx'
 
 /* ------------------------------------------------------------------ */
 /*  constants                                                          */
@@ -113,8 +116,12 @@ function Thumb({ bitmap }) {
 /* ------------------------------------------------------------------ */
 
 export default function App() {
+  const { config, user, loading: sessionLoading, refresh, signOut, setCredits } = useSession()
+  const providers = config?.providers ?? null
+  const [showBuy, setShowBuy] = useState(false)
+  const [welcome, setWelcome] = useState(null)
+
   const [source, setSource] = useState(null) // { bitmap, w, h, name }
-  const [providers, setProviders] = useState(null) // null = checking
   const [provider, setProvider] = useState('openai')
   const [style, setStyle] = useState('studio')
   const [size, setSize] = useState('2K')
@@ -137,17 +144,10 @@ export default function App() {
   const stageRef = useRef(null)
   const fileInputRef = useRef(null)
 
-  /* which providers have keys on the server */
   useEffect(() => {
-    fetch('/api/stencil')
-      .then((r) => r.json())
-      .then((j) => {
-        const list = j.providers || []
-        setProviders(list)
-        setProvider((p) => (list.includes(p) ? p : list[0] || p))
-      })
-      .catch(() => setProviders([]))
-  }, [])
+    const list = config?.providers
+    if (list?.length) setProvider((p) => (list.includes(p) ? p : list[0]))
+  }, [config])
 
   /* ---------------- loading ---------------- */
   const loadFile = useCallback(async (file) => {
@@ -218,13 +218,8 @@ export default function App() {
       ctx.imageSmoothingQuality = 'high'
       ctx.drawImage(source.bitmap, 0, 0, w, h)
       const image = c.toDataURL('image/jpeg', 0.92)
-      const r = await fetch('/api/stencil', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ image, provider, style, size, width: w, height: h }),
-      })
-      const json = await r.json().catch(() => ({}))
-      if (!r.ok) throw new Error(json.error || `Server error ${r.status}`)
+      const json = await api('/api/stencil', { method: 'POST', body: { image, provider, style, size, width: w, height: h } })
+      if (typeof json.credits === 'number') setCredits(json.credits)
       const blob = await (await fetch(json.image)).blob()
       const bitmap = await createImageBitmap(blob)
       const next = { bitmap, w: bitmap.width, h: bitmap.height, model: json.model, provider: json.provider, ms: json.ms, style, id: Date.now() }
@@ -235,11 +230,14 @@ export default function App() {
       setView('ai')
     } catch (e) {
       console.error(e)
+      if (typeof e.credits === 'number') setCredits(e.credits)
+      if (e.rechargeRequired) setShowBuy(true)
+      if (e.signInRequired) refresh()
       setError(e.message)
     } finally {
       setBusy(false)
     }
-  }, [source, busy, provider, style, size])
+  }, [source, busy, provider, style, size, setCredits, refresh])
 
   /* ---------------- render result with clean-up ---------------- */
   const renderResult = useCallback(
@@ -334,6 +332,9 @@ export default function App() {
   const noKey = providers !== null && providers.length === 0
   const providerMissing = providers !== null && providers.length > 0 && !providers.includes(provider)
   const showResult = !!result && view !== 'original'
+  const cost = config?.creditCost?.[size] ?? 1
+  const signedIn = !!user
+  const canAfford = !user || user.credits >= cost
 
   /* ------------------------------------------------------------------ */
   /*  render                                                             */
@@ -355,7 +356,8 @@ export default function App() {
         </div>
         <div className="flex items-center gap-2">
           <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => loadFile(e.target.files?.[0])} />
-          <button type="button" onClick={() => fileInputRef.current?.click()} className="rounded-lg border border-neutral-700 px-3 py-2 text-sm font-medium hover:border-neutral-500">
+          {signedIn && <CreditPill credits={user.credits} onClick={() => setShowBuy(true)} />}
+          <button type="button" onClick={() => fileInputRef.current?.click()} className="hidden rounded-lg border border-neutral-700 px-3 py-2 text-sm font-medium hover:border-neutral-500 sm:block">
             {source ? 'Replace photo' : 'Upload'}
           </button>
           <button
@@ -368,6 +370,7 @@ export default function App() {
             <span className="hidden sm:inline">Export PNG</span>
             <span className="sm:hidden">Export</span>
           </button>
+          {signedIn && <AccountMenu user={user} onBuy={() => setShowBuy(true)} onSignOut={signOut} />}
         </div>
       </header>
 
@@ -455,7 +458,7 @@ export default function App() {
             <div className="mb-3 flex items-center justify-between">
               <p className="text-[11px] font-medium tracking-wider text-accent uppercase">Style</p>
               <span className="text-[10px] text-neutral-500">
-                {providers === null ? 'checking server…' : providers.length ? `${providers.length === 2 ? 'OpenAI + Gemini' : providers[0] === 'openai' ? 'OpenAI' : 'Gemini'} ready` : 'no API key configured'}
+                {providers === null ? 'checking…' : providers.length ? `${providers.length === 2 ? 'OpenAI + Gemini' : providers[0] === 'openai' ? 'OpenAI' : 'Gemini'} ready` : 'no API key configured'}
               </span>
             </div>
             <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-1">
@@ -471,7 +474,10 @@ export default function App() {
                 </button>
               ))}
             </div>
-            <p className="mt-3 mb-1.5 text-[11px] text-neutral-400">Output size</p>
+            <p className="mt-3 mb-1.5 flex items-center justify-between text-[11px] text-neutral-400">
+              <span>Output size</span>
+              <span className="tabular-nums text-neutral-500">{cost} credit{cost > 1 ? 's' : ''} per stencil</span>
+            </p>
             <Segmented value={size} onChange={setSize} options={SIZES} />
             {providers && providers.length > 1 && (
               <>
@@ -479,24 +485,48 @@ export default function App() {
                 <Segmented value={provider} onChange={setProvider} options={[{ value: 'openai', label: 'OpenAI' }, { value: 'gemini', label: 'Gemini' }]} />
               </>
             )}
-            <button
-              type="button"
-              disabled={!source || busy || noKey || providerMissing}
-              onClick={generate}
-              className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-accent py-3 text-sm font-semibold text-neutral-950 hover:bg-accent-dim disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {busy ? (
-                <>
-                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-neutral-900/30 border-t-neutral-900" />
-                  Drawing… {elapsed}s
-                </>
-              ) : result ? (
-                '✦ Draw again'
-              ) : (
-                '✦ Generate stencil'
-              )}
-            </button>
-            {!source && <p className="mt-2 text-center text-[11px] text-neutral-500">Upload a photo first</p>}
+            {sessionLoading ? (
+              <div className="mt-3 h-12 animate-pulse rounded-lg bg-neutral-800/60" />
+            ) : signedIn ? (
+              <>
+                <button
+                  type="button"
+                  disabled={!source || busy || noKey || providerMissing}
+                  onClick={canAfford ? generate : () => setShowBuy(true)}
+                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-accent py-3 text-sm font-semibold text-neutral-950 hover:bg-accent-dim disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {busy ? (
+                    <>
+                      <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-neutral-900/30 border-t-neutral-900" />
+                      Drawing… {elapsed}s
+                    </>
+                  ) : !canAfford ? (
+                    'Add credits to continue'
+                  ) : result ? (
+                    '✦ Draw again'
+                  ) : (
+                    '✦ Generate stencil'
+                  )}
+                </button>
+                {!source && <p className="mt-2 text-center text-[11px] text-neutral-500">Upload a photo first</p>}
+              </>
+            ) : (
+              <div className="mt-3 rounded-lg border border-neutral-800 bg-neutral-950/60 p-3">
+                <p className="mb-1 text-center text-sm font-medium">
+                  Get {config?.welcomeCredits ?? 29} free credits
+                </p>
+                <p className="mb-3 text-center text-[11px] leading-snug text-neutral-500">
+                  Sign in with Google to start. That is {config?.welcomeCredits ?? 29} stencils on the house — no card needed.
+                </p>
+                <GoogleSignIn
+                  clientId={config?.googleClientId}
+                  onSignedIn={(out) => {
+                    refresh()
+                    if (out?.isNew) setWelcome(out.welcomeCredits)
+                  }}
+                />
+              </div>
+            )}
             {noKey && <p className="mt-2 rounded-md bg-red-900/40 px-2 py-1.5 text-[11px] leading-snug text-red-200">No API key configured on the server. Add OPENAI_API_KEY or GEMINI_API_KEY in Vercel → Settings → Environment Variables and redeploy.</p>}
             {error && <p className="mt-2 rounded-md bg-red-900/40 px-2 py-1.5 text-[11px] leading-snug text-red-200">{error}</p>}
             {result && <p className="mt-2 text-[11px] leading-snug text-neutral-500">Every run is a fresh drawing. Not happy with the likeness? Draw again.</p>}
@@ -555,19 +585,53 @@ export default function App() {
             </Section>
           )}
 
-          <p className="px-2 pb-6 text-center text-[11px] text-neutral-600">
-            Your photo is only sent to the AI model when you press Generate. Nothing is stored.
+          <p className="px-2 text-center text-[11px] leading-snug text-neutral-600">
+            Your photo is only sent to the AI model when you press Generate, and is not stored.
+            {config?.rupeesPerCredit ? ` Extra credits cost ₹${config.rupeesPerCredit} each.` : ''}
           </p>
+          <nav className="flex flex-wrap justify-center gap-x-3 gap-y-1 px-2 pb-6 text-[11px] text-neutral-600">
+            {[
+              ['Pricing', 'pricing'],
+              ['Terms', 'terms'],
+              ['Privacy', 'privacy'],
+              ['Refunds', 'refunds'],
+              ['Delivery', 'shipping'],
+              ['Contact', 'contact'],
+            ].map(([label, slug]) => (
+              <a key={slug} href={`/legal/${slug}.html`} className="hover:text-neutral-400 hover:underline">{label}</a>
+            ))}
+          </nav>
         </aside>
       </main>
+
+      {showBuy && (
+        <BuyCreditsModal
+          config={config}
+          user={user}
+          onClose={() => setShowBuy(false)}
+          onCredited={(credits) => setCredits(credits)}
+        />
+      )}
+
+      {welcome && (
+        <div className="fixed inset-x-0 top-3 z-50 mx-auto w-fit rounded-full border border-accent/50 bg-neutral-900 px-4 py-2 text-sm shadow-xl">
+          <span className="text-accent">✦</span> Welcome! {welcome} free credits added.
+          <button type="button" onClick={() => setWelcome(null)} className="ml-3 text-neutral-500 hover:text-neutral-200">✕</button>
+        </div>
+      )}
 
       {source && (
         <div className="sticky bottom-0 z-10 border-t border-neutral-800 bg-neutral-950/90 p-3 backdrop-blur lg:hidden">
           {result ? (
             <button type="button" onClick={exportPNG} className="w-full rounded-lg bg-accent py-3 text-sm font-semibold text-neutral-950">Export PNG · {result.w} px</button>
           ) : (
-            <button type="button" disabled={busy || noKey} onClick={generate} className="w-full rounded-lg bg-accent py-3 text-sm font-semibold text-neutral-950 disabled:opacity-50">
-              {busy ? `Drawing… ${elapsed}s` : '✦ Generate stencil'}
+            <button
+              type="button"
+              disabled={busy || noKey || !signedIn}
+              onClick={canAfford ? generate : () => setShowBuy(true)}
+              className="w-full rounded-lg bg-accent py-3 text-sm font-semibold text-neutral-950 disabled:opacity-50"
+            >
+              {!signedIn ? 'Sign in to generate' : busy ? `Drawing… ${elapsed}s` : !canAfford ? 'Add credits' : '✦ Generate stencil'}
             </button>
           )}
         </div>

@@ -9,6 +9,8 @@
     "preview": "vite preview --port 8801"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.1.0",
+    "jose": "^6.2.12",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
@@ -17,5 +19,8 @@
     "@vitejs/plugin-react": "^4.3.4",
     "tailwindcss": "^4.1.0",
     "vite": "^6.3.5"
+  },
+  "engines": {
+    "node": "24.x"
   }
 }
