@@ -131,6 +131,29 @@ they didn't get.
 
 ---
 
+## Lettering in Indian languages
+
+The studio has two modes, switched at the top: **Portrait** and **Lettering**.
+
+Lettering takes a name or phrase in Hindi, Tamil, Telugu, Kannada, Malayalam,
+Bengali, Gujarati, Punjabi, Odia or Urdu, and inks it as a stencil in one of
+six moods — Name, Emotional, Flexing, Devotional, Minimal or Ornamental.
+One credit, same as a portrait.
+
+**How the spelling is protected.** AI image models mangle Indic conjuncts and
+matras when they write a script from scratch, and a misspelt tattoo cannot be
+undone. So the browser typesets the phrase in a real Unicode font first, and
+the model is only ever asked to *restyle those exact shapes*. Two consequences
+worth knowing:
+
+- **Clean type** is always downloadable on its own. Its spelling is correct by
+  construction, whatever the AI does.
+- The panel tells the artist to compare the two and have a native reader check
+  it before tattooing. Keep that message there.
+
+If you want to add a language, the list is at the top of `src/Lettering.jsx` —
+each entry needs a Google Fonts family that covers the script.
+
 ## The admin panel
 
 **https://tattoo-stencil-studio-kappa.vercel.app/admin** — or "The books" in
