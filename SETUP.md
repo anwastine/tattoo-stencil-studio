@@ -1,7 +1,8 @@
 # Go-live checklist
 
-The app is built, deployed, and the database is live. One short step is left
-before people can sign in: creating the Google sign-in client.
+**Sign-in is live.** Anyone with a Google account can now sign in and get 29
+free credits. The only thing left is payments, and only when you want to start
+charging.
 
 Live now: https://tattoo-stencil-studio-kappa.vercel.app
 
@@ -17,7 +18,7 @@ Status right now:
 | Drawing (OpenAI) | ✅ working |
 | Accounts + credits database | ✅ done — Neon free plan, provisioned and tested |
 | Session key | ✅ done |
-| Sign in with Google | ⬜ **only this is left** — step 2, ~5 minutes |
+| Sign in with Google | ✅ done — published to production |
 | Card / UPI payments | ⬜ step 3, whenever you want to start charging |
 
 ---
@@ -36,29 +37,27 @@ Nothing to do here.
 
 ---
 
-## Step 2 — Sign in with Google (~5 minutes, free) ← **the only thing left**
+## Step 2 — Sign in with Google ✅ DONE
 
-Send me the Client ID when you have it and I will put it into Vercel and
-redeploy — it is a public identifier, not a secret, so it is safe to paste
-here. (The client *secret* is never needed; don't send that.)
+A dedicated Google Cloud project (**Tattoo Stencil Studio**, id
+`tattoo-stencil-studio`) was created so the consent screen carries this app's
+own name rather than another project's.
 
-1. Go to https://console.cloud.google.com/apis/credentials and sign in with
-   anwastine@gmail.com. Create a project if it asks.
-2. **Create credentials → OAuth client ID → Application type: Web application.**
-3. Under **Authorised JavaScript origins** click *Add URI* twice and add:
-   - `https://tattoo-stencil-studio-kappa.vercel.app`
-   - `http://localhost:8801`
-4. Leave **Authorised redirect URIs empty.** This sign-in flow does not use them.
-5. Click **Create** and copy the **Client ID** (it ends in
-   `.apps.googleusercontent.com`). You do **not** need the client secret —
-   don't add it anywhere.
-6. Send me that Client ID, or add it in Vercel yourself as `GOOGLE_CLIENT_ID`.
-7. Still in Google Cloud, open **APIs & Services → OAuth consent screen**.
-   Fill in the app name, your support email and developer contact. Keep the
-   scopes to `email`, `profile`, `openid`. Then press **Publish app** —
-   until you do, only accounts you list by hand can sign in.
-Once the Client ID is in and the site redeploys, sign-in and the 29 free
-credits work immediately — the database behind them is already live.
+- OAuth consent screen: app name "Tattoo Stencil Studio", support and developer
+  contact anwastine@gmail.com, home page / privacy / terms pointing at the live
+  site, audience **External**, publishing status **In production** — so any
+  Google account can sign in, not just test users.
+- OAuth client "Tattoo Stencil Studio Web" with authorised JavaScript origins
+  for the live site, the team alias and `http://localhost:8801`. No redirect
+  URIs, which this flow does not use. The client secret was never needed.
+- `GOOGLE_CLIENT_ID` set in Vercel for all three environments and redeployed.
+
+Manage it at
+https://console.cloud.google.com/auth/clients?project=tattoo-stencil-studio
+
+If you later add a custom domain, add it in two places or sign-in will break:
+the OAuth client's **Authorised JavaScript origins**, and **Branding →
+Authorised domains**.
 
 ---
 
