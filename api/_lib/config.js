@@ -4,7 +4,7 @@
  */
 
 /** Free credits granted once, the first time a person signs in with Google. */
-export const WELCOME_CREDITS = 29
+export const WELCOME_CREDITS = 10
 
 /** Rupees per credit. Displayed everywhere; orders are created in paise. */
 export const RUPEES_PER_CREDIT = 9

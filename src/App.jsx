@@ -5,10 +5,11 @@ import SignIn, { Splash } from './SignIn.jsx'
 import PhonePrompt from './PhonePrompt.jsx'
 import Admin from './Admin.jsx'
 import Lettering from './Lettering.jsx'
-import { paintStencil, downloadStencil } from './stencil.js'
+import { paintStencil } from './stencil.js'
 import { CreditTicket, AccountMenu, BuyCreditsModal } from './Wallet.jsx'
 import { startTattooCursor } from './cursors.js'
 import { Lockup } from './Logo.jsx'
+import PrintDialog from './PrintDialog.jsx'
 
 /* ------------------------------------------------------------------ */
 /*  constants                                                          */
@@ -208,6 +209,7 @@ export default function App() {
   const [elapsed, setElapsed] = useState(0)
   const [error, setError] = useState(null)
   const [result, setResult] = useState(null)
+  const [showPrint, setShowPrint] = useState(false)
   const [history, setHistory] = useState([])
   const [threshold, setThreshold] = useState(0)
   const [ink, setInk] = useState('#0b0a09')
@@ -343,11 +345,10 @@ export default function App() {
     return () => ro.disconnect()
   }, [shown])
 
-  const exportPNG = useCallback(async () => {
-    if (!result) return
-    await downloadStencil(result.bitmap, result.w, result.h, finish,
-      `${source?.name || 'portrait'}-stencil-${result.style}${mirror ? '-mirrored' : ''}.png`)
-  }, [result, finish, mirror, source])
+  const printName = useMemo(
+    () => `${(source?.name || 'portrait').replace(/\.[a-z0-9]+$/i, '')}-${result?.style || 'stencil'}`,
+    [source, result],
+  )
 
   const onSplitPointer = (e) => {
     if (view !== 'split' || !result) return
@@ -406,7 +407,7 @@ export default function App() {
                 <button type="button" onClick={() => fileInputRef.current?.click()} className="btn-quiet hidden rounded-sm px-3 py-2 text-[11px] sm:block">
                   {source ? 'New photo' : 'Upload'}
                 </button>
-                <button type="button" disabled={!result} onClick={exportPNG} className="btn-ink rounded-sm px-3.5 py-2 text-[11px] sm:px-4">
+                <button type="button" disabled={!result} onClick={() => setShowPrint(true)} className="btn-ink rounded-sm px-3.5 py-2 text-[11px] sm:px-4">
                   Download
                 </button>
               </>
@@ -630,6 +631,17 @@ export default function App() {
         <BuyCreditsModal config={config} user={user} onClose={() => setShowBuy(false)} onCredited={(credits) => setCredits(credits)} />
       )}
 
+      {showPrint && result && (
+        <PrintDialog
+          bitmap={result.bitmap}
+          w={result.w}
+          h={result.h}
+          finish={finish}
+          filename={printName}
+          onClose={() => setShowPrint(false)}
+        />
+      )}
+
       {welcome && (
         <div className="fixed inset-x-0 top-4 z-50 mx-auto w-fit max-w-[92vw] rounded-sm border border-gold/50 bg-ink-2 px-5 py-3 text-center shadow-2xl">
           <p className="wordmark text-lg text-paper">Welcome to the studio</p>
@@ -642,7 +654,7 @@ export default function App() {
         <div className="sticky bottom-0 z-10 flex gap-2 border-t border-gold/20 bg-ink/95 p-3 backdrop-blur lg:hidden">
           <button type="button" onClick={() => fileInputRef.current?.click()} className="btn-quiet rounded-sm px-4 py-3 text-[11px]">New</button>
           {result ? (
-            <button type="button" onClick={exportPNG} className="btn-ink flex-1 rounded-sm py-3 text-[12px]">Download stencil</button>
+            <button type="button" onClick={() => setShowPrint(true)} className="btn-ink flex-1 rounded-sm py-3 text-[12px]">Download stencil</button>
           ) : (
             <button
               type="button"

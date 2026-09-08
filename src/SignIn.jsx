@@ -62,7 +62,7 @@ const POINTS = [
 /* ------------------------------------------------------------------ */
 
 export default function SignIn({ config, onSignedIn }) {
-  const welcomeCredits = config?.welcomeCredits ?? 29
+  const welcomeCredits = config?.welcomeCredits ?? 10
   const rupees = config?.rupeesPerCredit ?? 9
 
   return (

@@ -111,8 +111,22 @@ const stencilGet = await call(stencil, { method: 'GET' })
 check('stencil GET: reports model', stencilGet.status === 200 && !!stencilGet.json?.model, `got ${stencilGet.status}`)
 
 const letteringGet = await call(lettering, { method: 'GET' })
-check('lettering GET: lists scripts and moods',
-  letteringGet.status === 200 && Object.keys(letteringGet.json?.scripts || {}).length >= 10 && (letteringGet.json?.moods || []).length === 6)
+check('lettering GET: lists scripts, moods and motifs',
+  letteringGet.status === 200 &&
+  Object.keys(letteringGet.json?.scripts || {}).length >= 10 &&
+  (letteringGet.json?.moods || []).length === 6 &&
+  (letteringGet.json?.motifs || []).length >= 10,
+  JSON.stringify({ moods: letteringGet.json?.moods?.length, motifs: letteringGet.json?.motifs?.length }))
+
+/* Transliteration is what lets someone type "amma" instead of hunting for a
+   Telugu keyboard, so a silent upstream change is worth catching. This is the
+   one check that talks to a third party. */
+const { default: translit } = await import('../api/translit.js')
+const tl = await call(translit, { method: 'GET', url: '/api/translit?lang=telugu&text=amma' })
+check('translit: converts a roman word', tl.status === 200 && (tl.json?.candidates || []).length > 0, JSON.stringify(tl.json))
+check('translit: returns the target script', /[\u0C00-\u0C7F]/.test(tl.json?.candidates?.[0] || ''), tl.json?.candidates?.[0])
+const tlBad = await call(translit, { method: 'GET', url: '/api/translit?lang=klingon&text=amma' })
+check('translit: refuses an unknown language', tlBad.status === 400, `got ${tlBad.status}`)
 
 /* ---------------- payments ---------------- */
 /*
