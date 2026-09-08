@@ -65,14 +65,33 @@ const SCRIPTS = [
     fonts: [{ label: 'Nastaliq', family: 'Noto Nastaliq Urdu', google: 'Noto+Nastaliq+Urdu:wght@600' }] },
 ]
 
+/* Styles, grouped so eighteen of them stay browsable. Labels and blurbs mirror
+   MOODS in api/lettering.js; the server owns the actual prompt wording. */
 const MOODS = [
-  { id: 'name', label: 'Name', desc: 'Elegant and timeless — the name is the design' },
-  { id: 'emotional', label: 'Emotional', desc: 'Soft flowing script, one delicate accent' },
-  { id: 'flexing', label: 'Flexing', desc: 'Heavy, sharp, chicano and graffiti energy' },
-  { id: 'devotional', label: 'Devotional', desc: 'Carved like temple stone, quiet border' },
-  { id: 'minimal', label: 'Minimal', desc: 'One hairline weight, no ornament at all' },
-  { id: 'ornamental', label: 'Ornamental', desc: 'Filigree and dot-work framing the words' },
+  { id: 'name', group: 'Classic', label: 'Name', desc: 'Elegant and timeless — the name is the design' },
+  { id: 'minimal', group: 'Classic', label: 'Minimal', desc: 'One hairline weight, no ornament at all' },
+  { id: 'ornamental', group: 'Classic', label: 'Ornamental', desc: 'Filigree and dot-work framing the words' },
+  { id: 'vintage', group: 'Classic', label: 'Vintage sign', desc: "A 1930s sign painter's panel" },
+  { id: 'royal', group: 'Classic', label: 'Royal', desc: 'High-contrast serif, crowned and symmetrical' },
+
+  { id: 'romantic', group: 'Feeling', label: 'Romantic', desc: 'A love letter — looping copperplate flourishes' },
+  { id: 'emotional', group: 'Feeling', label: 'Emotional', desc: 'Soft flowing script, one delicate accent' },
+  { id: 'sultry', group: 'Feeling', label: 'Sultry', desc: 'Boudoir pin-up — languid curves, silk and lace' },
+  { id: 'devotional', group: 'Feeling', label: 'Devotional', desc: 'Carved like temple stone, quiet border' },
+  { id: 'memorial', group: 'Feeling', label: 'Memorial', desc: 'Quiet and dignified, for remembrance' },
+
+  { id: 'flexing', group: 'Street', label: 'Flexing', desc: 'Heavy, sharp, graffiti energy' },
+  { id: 'chicano', group: 'Street', label: 'Chicano', desc: 'Single-needle fine-line script' },
+  { id: 'gothic', group: 'Street', label: 'Gothic', desc: 'Medieval blackletter, severe and upright' },
+  { id: 'grunge', group: 'Street', label: 'Grunge', desc: 'Dry brush, split strokes, spatter' },
+  { id: 'horror', group: 'Street', label: 'Horror', desc: 'Jagged, barbed, dripping' },
+
+  { id: 'cyber', group: 'Modern', label: 'Cyber', desc: 'Angular, chamfered, circuit hairlines' },
+  { id: 'nature', group: 'Modern', label: 'Nature', desc: 'Grown from branches and leaves' },
+  { id: 'celestial', group: 'Modern', label: 'Celestial', desc: 'Moon, stars and constellation lines' },
 ]
+
+const MOOD_GROUPS = [...new Set(MOODS.map((m) => m.group))].map((g) => [g, MOODS.filter((m) => m.group === g)])
 
 /* Woven symbols. Keep in step with MOTIFS in api/lettering.js — the server
    owns the wording, this list only supplies the buttons. */
@@ -474,18 +493,25 @@ export default function Lettering({ user, config, setCredits, onNeedCredits, ref
             <p className="stamp text-[11px] text-gold">Mood</p>
             <span className="stamp text-[10px] text-paper-3/50">{perStencil} credit each</span>
           </div>
-          <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-1">
-            {MOODS.map((m) => (
-              <button
-                key={m.id}
-                type="button"
-                data-on={m.id === mood}
-                onClick={() => setMood(m.id)}
-                className="flash-card rounded-sm px-3 py-2.5 text-left"
-              >
-                <span className="stamp block text-[13px] text-paper">{m.label}</span>
-                <span className="block truncate text-[11px] text-paper-3/70">{m.desc}</span>
-              </button>
+          <div className="space-y-2.5">
+            {MOOD_GROUPS.map(([group, list]) => (
+              <div key={group}>
+                <p className="stamp mb-1 text-[9px] text-paper-3/45">{group}</p>
+                <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-1">
+                  {list.map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      data-on={m.id === mood}
+                      onClick={() => setMood(m.id)}
+                      className="flash-card rounded-sm px-3 py-2 text-left"
+                    >
+                      <span className="stamp block text-[12px] text-paper">{m.label}</span>
+                      <span className="block truncate text-[10px] text-paper-3/70">{m.desc}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
 

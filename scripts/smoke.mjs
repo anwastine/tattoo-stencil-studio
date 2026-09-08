@@ -114,7 +114,7 @@ const letteringGet = await call(lettering, { method: 'GET' })
 check('lettering GET: lists scripts, moods and motifs',
   letteringGet.status === 200 &&
   Object.keys(letteringGet.json?.scripts || {}).length >= 10 &&
-  (letteringGet.json?.moods || []).length === 6 &&
+  (letteringGet.json?.moods || []).length >= 18 &&
   (letteringGet.json?.motifs || []).length >= 10,
   JSON.stringify({ moods: letteringGet.json?.moods?.length, motifs: letteringGet.json?.motifs?.length }))
 

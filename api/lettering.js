@@ -98,34 +98,91 @@ const MOTIFS = {
 
 export const MOTIF_LIST = Object.entries(MOTIFS).map(([id, m]) => ({ id, label: m.label }))
 
+/* The style the whole piece is drawn in. Grouped so eighteen of them stay
+   browsable rather than becoming a wall of buttons. */
 const MOODS = {
+  /* ---- classic ---- */
   name: {
-    label: 'Name',
+    label: 'Name', group: 'Classic', desc: 'Elegant and timeless — the name is the design',
     prompt: `- Style: a personal name piece. Confident, timeless letterforms with strong weight contrast, and one long graceful swash sweeping underneath the whole word to carry it. Restrained — the name is the design.`,
   },
-  emotional: {
-    label: 'Emotional',
-    prompt: `- Style: soft and heartfelt, written in one breath. Deep thick-to-thin modulation, generous flowing curves, and a long ribbon-like stroke curving beneath the word and tapering away to nothing.`,
-  },
-  flexing: {
-    label: 'Flexing',
-    prompt: `- Style: bold and loud. Heavy blackletter and chicano influence, sharp spurs, aggressive serifs, tight spacing, very high stroke contrast. Reads from across the room.`,
-  },
-  devotional: {
-    label: 'Devotional',
-    prompt: `- Style: sacred and reverent. Letterforms with the even, carved weight of temple stone, and a quiet symmetrical flourish above and below the word. Calm and upright.`,
-  },
   minimal: {
-    label: 'Minimal',
+    label: 'Minimal', group: 'Classic', desc: 'One hairline weight, no ornament at all',
     prompt: `- Style: fine line. A single consistent hairline weight throughout — this is the one style with no thick-to-thin contrast. No fills, no ornament, airy spacing, one long thin tail. The kind of small quiet tattoo that sits on a wrist.`,
   },
   ornamental: {
-    label: 'Ornamental',
+    label: 'Ornamental', group: 'Classic', desc: 'Filigree and dot-work framing the words',
     prompt: `- Style: ornate. Filigree grows out of the letters themselves — paisley, vines, fine dot-work, mandala flourishes — surrounding and decorating without ever overlapping or obscuring a single character.`,
+  },
+  vintage: {
+    label: 'Vintage sign', group: 'Classic', desc: "A 1930s sign painter's panel",
+    prompt: `- Style: a 1930s sign painter's panel. Confident brush script with strong swash capitals, a hard drop shadow rendered as solid black offset down and right, and a fine keyline running parallel to the letters.`,
+  },
+  royal: {
+    label: 'Royal', group: 'Classic', desc: 'High-contrast serif, crowned and symmetrical',
+    prompt: `- Style: regal. High-contrast serif letterforms with sharp entry strokes and fine hairlines, a symmetrical ornamental rule above and below the word, and one small finely drawn coronet flourish centred over it.`,
+  },
+
+  /* ---- feeling ---- */
+  romantic: {
+    label: 'Romantic', group: 'Feeling', desc: 'A love letter — looping copperplate flourishes',
+    prompt: `- Style: a love letter. Copperplate and Spencerian influence — a steep consistent slant, whisper-thin hairline upstrokes against deep swelling downstrokes, and extravagant looping flourishes off the first and last letters that curl back over and under the word without touching it. Tender, generous, unhurried.`,
+  },
+  emotional: {
+    label: 'Emotional', group: 'Feeling', desc: 'Soft flowing script, one delicate accent',
+    prompt: `- Style: soft and heartfelt, written in one breath. Deep thick-to-thin modulation, generous flowing curves, and a long ribbon-like stroke curving beneath the word and tapering away to nothing.`,
+  },
+  sultry: {
+    label: 'Sultry', group: 'Feeling', desc: 'Boudoir pin-up — languid curves, silk and lace',
+    prompt: `- Style: sensual and slow, in the register of classic boudoir pin-up flash. A languid slant, exaggerated hips to the curves, very high contrast between whisper-thin hairlines and heavy swelling strokes, and long tapering tails that trail off like silk. One restrained accent is welcome — a fine lace edge along a stroke, a ribbon curling through a letter, or a small lipstick kiss set beside the word. Alluring and elegant; never crude, and no figures or bodies.`,
+  },
+  devotional: {
+    label: 'Devotional', group: 'Feeling', desc: 'Carved like temple stone, quiet border',
+    prompt: `- Style: sacred and reverent. Letterforms with the even, carved weight of temple stone, and a quiet symmetrical flourish above and below the word. Calm and upright.`,
+  },
+  memorial: {
+    label: 'Memorial', group: 'Feeling', desc: 'Quiet and dignified, for remembrance',
+    prompt: `- Style: a remembrance piece. Quiet, upright, evenly weighted letters with generous spacing, a fine horizontal rule beneath the word, and one restrained flourish. Dignified — nothing loud, nothing decorative for its own sake.`,
+  },
+
+  /* ---- street ---- */
+  flexing: {
+    label: 'Flexing', group: 'Street', desc: 'Heavy, sharp, graffiti energy',
+    prompt: `- Style: bold and loud. Heavy blackletter and chicano influence, sharp spurs, aggressive serifs, tight spacing, very high stroke contrast. Reads from across the room.`,
+  },
+  chicano: {
+    label: 'Chicano', group: 'Street', desc: 'Single-needle fine-line script',
+    prompt: `- Style: LA fine-line script. Even thin strokes at a fast confident slant, long crossing flourishes trailing off the ends, the look of a single-needle piece. Sharp and clean, no solid fills.`,
+  },
+  gothic: {
+    label: 'Gothic', group: 'Street', desc: 'Medieval blackletter, severe and upright',
+    prompt: `- Style: medieval blackletter textura. Dense vertical strokes with diamond terminals, hairline connecting strokes, a tight even rhythm. Severe and upright, with one sharp flourish off the final letter.`,
+  },
+  grunge: {
+    label: 'Grunge', group: 'Street', desc: 'Dry brush, split strokes, spatter',
+    prompt: `- Style: rough brush. Dry-brush drag leaving the stroke split and broken in places, ragged edges, a little ink spatter flicking off the ends. Fast and unpolished — but every character stays legible.`,
+  },
+  horror: {
+    label: 'Horror', group: 'Street', desc: 'Jagged, barbed, dripping',
+    prompt: `- Style: dread. Jagged uneven strokes with sharp barbs on the terminals and a few heavy drips running down from the baseline. Deliberately rough. Legible but unsettling.`,
+  },
+
+  /* ---- modern ---- */
+  cyber: {
+    label: 'Cyber', group: 'Modern', desc: 'Angular, chamfered, circuit hairlines',
+    prompt: `- Style: angular and technical. Letterforms rebuilt from straight cuts and hard corners with chamfered ends, and hairline circuit-like extensions running off the terminals into small square nodes.`,
+  },
+  nature: {
+    label: 'Nature', group: 'Modern', desc: 'Grown from branches and leaves',
+    prompt: `- Style: grown, not written. The strokes are branches — fine bark texture, small leaves and one bud sprouting where a stroke turns or ends. Organic, asymmetric, still perfectly readable.`,
+  },
+  celestial: {
+    label: 'Celestial', group: 'Modern', desc: 'Moon, stars and constellation lines',
+    prompt: `- Style: night sky. Fine even letterstrokes, a crescent moon resting where a stroke curves, and a scatter of small stars along a long sweeping arc beneath the word, joined by hairlines like a constellation.`,
   },
 }
 
-export const MOOD_LIST = Object.entries(MOODS).map(([id, m]) => ({ id, label: m.label }))
+export const MOOD_LIST = Object.entries(MOODS).map(([id, m]) => ({ id, label: m.label, group: m.group, desc: m.desc }))
 
 /* per-instance flood guard, same as the portrait route */
 const burst = new Map()
