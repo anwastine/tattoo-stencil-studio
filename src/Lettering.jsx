@@ -269,7 +269,8 @@ export default function Lettering({ user, config, setCredits, onNeedCredits, ref
      only useful once it is the size it will be tattooed at. The clean type is
      re-typeset large so a 600 dpi sheet is not upscaled from the screen copy. */
   const baseName = useCallback(
-    () => (text.trim().split('\n')[0] || 'lettering').slice(0, 24).replace(/[^\p{L}\p{N}]+/gu, '-'),
+    /* \p{M} keeps matras and viramas: without it "అమ్మ" saves as "అమ-మ". */
+    () => (text.trim().split('\n')[0] || 'lettering').slice(0, 24).replace(/[^\p{L}\p{N}\p{M}]+/gu, '-'),
     [text],
   )
 
