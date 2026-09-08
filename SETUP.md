@@ -63,73 +63,62 @@ Authorised domains**.
 
 ## Step 3 — Taking payments (Razorpay)
 
-Test keys work immediately. Live keys need Razorpay to approve the account,
-and they check the policy pages, so do the placeholders first.
+### Where this stands
 
-### 3a. Fill in your business details
+The existing Razorpay account (Mohmed Anwar Pasha, MID TPfQy39JU20CGt) is
+**fully activated** with a live key and one approved website,
+eventproductsindia.com. KYC is already done there.
 
-Open these six files and replace every highlighted placeholder — business
-name, address, email, phone, grievance officer, city:
+**But sui.ink cannot go on that account.** When adding a second website
+Razorpay states plainly: *"Additional websites must follow the same business
+model as your first site. For a different business model, you'll need to
+create a separate Razorpay account, though you can use the same login
+credentials."* Event products and an AI stencil service are different
+business models, so sui.ink needs its own account.
 
-```
-public/legal/contact.html
-public/legal/terms.html
-public/legal/privacy.html
-public/legal/refunds.html
-public/legal/pricing.html
-public/legal/shipping.html
-```
+The legal pages are finished and carry the registered identity:
+Mohmed Anwar Pasha, O-08 2nd Floor, Signature Global Park 2&3, Dhunela,
+Sector 36, Sohna, Gurugram, Haryana 122103. Not GST registered, so no GSTIN
+is shown and no GST is charged.
 
-Placeholders look like `[BUSINESS NAME]` and are highlighted in orange on the
-page, so they are easy to spot. Ask me and I'll edit them for you — just send
-me the details.
+### 3a. Prove it works first, in Test Mode (no new account needed)
 
-### 3b. Open the account
+Test keys work immediately, on any domain, with no website approval.
 
-1. Sign up at https://dashboard.razorpay.com/signup.
-2. **Settings → API Keys** → generate **test mode** keys.
-3. In Vercel add `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET`, then redeploy.
-   Top-ups now work with Razorpay's test cards.
-4. For real money: complete KYC, and under **Account Settings → Business
-   Website Details** submit these URLs:
-   - `https://sui.ink/legal/terms.html`
-   - `.../legal/privacy.html`
-   - `.../legal/refunds.html`
-   - `.../legal/shipping.html`
-   - `.../legal/pricing.html`
-   - `.../legal/contact.html`
-5. Once approved, swap the test keys for the live ones in Vercel and redeploy.
+1. In the Razorpay dashboard click the **MP** avatar → **Enable Test Mode**.
+2. **Account & Settings → Websites & API keys → Generate Test Key**.
+   Copy the `rzp_test_...` id and the secret (shown once).
+3. In Vercel → Settings → Environment Variables add, ticking all three
+   environments:
+   - `RAZORPAY_KEY_ID` = the `rzp_test_...` id
+   - `RAZORPAY_KEY_SECRET` = the test secret
+4. Redeploy, then the wallet can be tested end to end with Razorpay's test
+   cards. No real money moves.
 
-### 3c. Webhook (recommended)
+### 3b. Then open a separate account for sui.ink
 
-So a payment still lands if someone closes the tab mid-checkout:
+Use **Create new account** from that same dialog — same login credentials, new
+merchant account. It needs its own KYC (PAN, bank account, address), and then
+submit `https://sui.ink` plus the six policy page URLs under
+**Account Settings → Business Website Details**.
+
+When it is approved, swap the two Vercel variables for that account's live
+key pair and redeploy.
+
+**Never click "Regenerate Key" on the live key of the events account** — it is
+in use by eventproductsindia.com and regenerating stops payments there until
+that site is updated too.
+
+### 3c. Webhook (optional, add when live)
 
 **Settings → Webhooks → Add New Webhook**
 - URL: `https://sui.ink/api/payments/webhook`
 - Event: `payment.captured`
-- Secret: make one up (or `openssl rand -hex 24`)
+- Secret: one you choose, also stored in Vercel as `RAZORPAY_WEBHOOK_SECRET`
 
-Add that same secret in Vercel as `RAZORPAY_WEBHOOK_SECRET`, then redeploy.
-
----
-
-## The numbers
-
-Set in `api/_lib/config.js`, one place, easy to change:
-
-- 29 free credits on first sign-in, once per email address
-- ₹9 per credit, 1 credit per stencil
-- Packs of 10 / 25 / 50 / 100 credits
-- 30 stencils per hour and 120 per day per account, one at a time
-
-A stencil costs roughly ₹5–7 in OpenAI charges, so each ₹9 credit leaves a
-small margin. Watch your real spend at https://platform.openai.com/usage for
-the first week and raise the price if the margin is too thin.
-
-Failed drawings refund the credit automatically, so nobody pays for a stencil
-they didn't get.
-
----
+Credits still land without it — the browser confirms payment and the server
+verifies the capture with Razorpay directly. The webhook is a safety net for
+someone closing the tab mid-payment.
 
 ## Lettering in Indian languages
 
