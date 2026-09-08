@@ -13,6 +13,7 @@
  *   node --env-file=.env.local scripts/smoke.mjs
  */
 
+import crypto from 'node:crypto'
 import { Readable } from 'node:stream'
 import { SignJWT } from 'jose'
 import { neon } from '@neondatabase/serverless'
@@ -32,12 +33,12 @@ const check = (name, ok, detail = '') => {
    "is the service configured" gate. */
 process.env.OPENAI_API_KEY ||= 'placeholder-for-smoke-test'
 
-function mockReq({ method = 'POST', body, cookie, url = '/' }) {
-  const raw = Buffer.from(JSON.stringify(body ?? {}))
-  const req = Readable.from([raw])
+function mockReq({ method = 'POST', body, raw, cookie, url = '/', headers = {} }) {
+  const bytes = Buffer.from(raw ?? JSON.stringify(body ?? {}))
+  const req = Readable.from([bytes])
   req.method = method
   req.url = url
-  req.headers = { 'content-type': 'application/json', ...(cookie ? { cookie } : {}) }
+  req.headers = { 'content-type': 'application/json', ...(cookie ? { cookie } : {}), ...headers }
   req.socket = { remoteAddress: '127.0.0.1' }
   return req
 }
@@ -112,6 +113,86 @@ check('stencil GET: reports model', stencilGet.status === 200 && !!stencilGet.js
 const letteringGet = await call(lettering, { method: 'GET' })
 check('lettering GET: lists scripts and moods',
   letteringGet.status === 200 && Object.keys(letteringGet.json?.scripts || {}).length >= 10 && (letteringGet.json?.moods || []).length === 6)
+
+/* ---------------- payments ---------------- */
+/*
+ * The money paths, exercised without touching Razorpay.
+ *
+ * Two things must hold or people lose money: a forged checkout response must
+ * never add credits, and a paid order must credit exactly once however many
+ * times the callback arrives — Razorpay retries webhooks, and the browser's
+ * /verify call races them. Idempotency rests on one unique index; this proves
+ * the index is actually doing its job.
+ *
+ * /verify's happy path is not testable here: after checking the signature it
+ * asks Razorpay whether the money really landed, which needs the live secret.
+ * The webhook does no outbound call, so crediting is tested through that.
+ */
+
+process.env.RAZORPAY_KEY_ID ||= 'rzp_test_smoke'
+process.env.RAZORPAY_KEY_SECRET ||= 'smoke-key-secret'
+process.env.RAZORPAY_WEBHOOK_SECRET ||= 'smoke-webhook-secret'
+
+const { default: verifyPay } = await import('../api/payments/verify.js')
+const { default: payWebhook } = await import('../api/payments/webhook.js')
+const { createOrderRow, getUser } = await import('../api/_lib/db.js')
+
+const ORDER = 'order_smoke_' + Math.random().toString(36).slice(2, 10)
+const PAYMENT = 'pay_smoke_' + Math.random().toString(36).slice(2, 10)
+const ORDER_CREDITS = 10
+
+await createOrderRow({ id: ORDER, userId: user.id, credits: ORDER_CREDITS, amountPaise: ORDER_CREDITS * 900 })
+const before = (await getUser(user.id)).credits
+
+const forged = await call(verifyPay, {
+  cookie,
+  body: { razorpay_order_id: ORDER, razorpay_payment_id: PAYMENT, razorpay_signature: 'deadbeef'.repeat(8) },
+})
+check('payments: forged signature is refused', forged.status === 400 && /signature/i.test(forged.json?.error || ''), `${forged.status} ${forged.json?.error}`)
+check('payments: forged signature added no credits', (await getUser(user.id)).credits === before, 'credits moved on a forged signature')
+
+const event = JSON.stringify({
+  event: 'payment.captured',
+  payload: { payment: { entity: { id: PAYMENT, order_id: ORDER, status: 'captured' } } },
+})
+const sign = (raw) => crypto.createHmac('sha256', process.env.RAZORPAY_WEBHOOK_SECRET).update(raw).digest('hex')
+
+const badHook = await call(payWebhook, { raw: event, headers: { 'x-razorpay-signature': sign(event + 'x') } })
+check('webhook: wrong signature is refused', badHook.status === 400, `got ${badHook.status}`)
+check('webhook: wrong signature added no credits', (await getUser(user.id)).credits === before, 'credits moved on a bad webhook')
+
+const hook1 = await call(payWebhook, { raw: event, headers: { 'x-razorpay-signature': sign(event) } })
+check('webhook: a captured payment is accepted', hook1.status === 200, `got ${hook1.status}`)
+const afterFirst = (await getUser(user.id)).credits
+check('webhook: credits the order once', afterFirst === before + ORDER_CREDITS, `${before} -> ${afterFirst}, expected +${ORDER_CREDITS}`)
+
+const hook2 = await call(payWebhook, { raw: event, headers: { 'x-razorpay-signature': sign(event) } })
+check('webhook: a retry is accepted', hook2.status === 200, `got ${hook2.status}`)
+const afterRetry = (await getUser(user.id)).credits
+check('webhook: a retry does not double-credit', afterRetry === afterFirst, `${afterFirst} -> ${afterRetry} on redelivery`)
+
+/* The browser's own confirmation, arriving after the webhook already credited
+   the same order — the common race. Razorpay's payment lookup is stubbed so the
+   route can be driven all the way through crediting without a live secret. */
+const realFetch = globalThis.fetch
+globalThis.fetch = async (url, init) =>
+  String(url).includes('/v1/payments/')
+    ? new Response(JSON.stringify({ id: PAYMENT, order_id: ORDER, status: 'captured', amount: ORDER_CREDITS * 900 }), { status: 200, headers: { 'content-type': 'application/json' } })
+    : realFetch(url, init)
+
+const replay = await call(verifyPay, {
+  cookie,
+  body: {
+    razorpay_order_id: ORDER,
+    razorpay_payment_id: PAYMENT,
+    razorpay_signature: crypto.createHmac('sha256', process.env.RAZORPAY_KEY_SECRET).update(`${ORDER}|${PAYMENT}`).digest('hex'),
+  },
+})
+globalThis.fetch = realFetch
+
+check('payments: a genuine signature is accepted', replay.status === 200, `${replay.status} ${replay.json?.error}`)
+check('payments: /verify sees the order already credited', replay.json?.alreadyCredited === true && replay.json?.added === 0, JSON.stringify(replay.json))
+check('payments: /verify after the webhook does not double-credit', (await getUser(user.id)).credits === afterFirst, 'credits moved when the browser confirmed an already-credited order')
 
 /* ---------------- cleanup ---------------- */
 

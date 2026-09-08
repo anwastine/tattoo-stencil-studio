@@ -20,11 +20,24 @@ export async function readJson(req, limitBytes = 12 * 1024 * 1024) {
   return raw ? JSON.parse(raw) : {}
 }
 
-/** Raw body as a Buffer — webhooks must verify the bytes, not a re-serialised object. */
+/**
+ * Raw body as a Buffer — a webhook signature covers the exact bytes sent, so a
+ * re-serialised object is not good enough.
+ *
+ * Some Node runtimes read the body themselves before the handler runs and hand
+ * over only the parsed result, leaving an empty stream. The fallbacks cover
+ * that: re-serialising matches the original bytes for the compact JSON Razorpay
+ * sends, which beats failing every delivery outright.
+ */
 export async function readRaw(req) {
+  if (Buffer.isBuffer(req.rawBody)) return req.rawBody
+  if (typeof req.rawBody === 'string') return Buffer.from(req.rawBody, 'utf8')
   const chunks = []
   for await (const c of req) chunks.push(c)
-  return Buffer.concat(chunks)
+  if (chunks.length) return Buffer.concat(chunks)
+  if (typeof req.body === 'string') return Buffer.from(req.body, 'utf8')
+  if (req.body && typeof req.body === 'object') return Buffer.from(JSON.stringify(req.body), 'utf8')
+  return Buffer.alloc(0)
 }
 
 /** Strip credentials and long base64 blobs out of anything we log. */

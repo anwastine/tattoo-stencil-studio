@@ -355,6 +355,10 @@ export async function getOrder(id) {
 /**
  * Credit a paid order exactly once. The unique (kind, ref) ledger index is the
  * guard: a replayed callback or a webhook racing the browser cannot double-credit.
+ *
+ * That index is partial (rows with a ref only), so ON CONFLICT has to repeat the
+ * same WHERE predicate — Postgres will not pick a partial index as the conflict
+ * arbiter otherwise, and the insert fails outright instead of doing nothing.
  * Returns { credited, credits }.
  */
 export async function creditOrder({ orderId, paymentId }) {
@@ -366,7 +370,7 @@ export async function creditOrder({ orderId, paymentId }) {
   const claim = await sql`
     INSERT INTO ledger (user_id, kind, credits, ref, meta)
     VALUES (${order.user_id}, 'purchase', ${order.credits}, ${orderId}, ${JSON.stringify({ paymentId, amountPaise: order.amount_paise })})
-    ON CONFLICT (kind, ref) DO NOTHING
+    ON CONFLICT (kind, ref) WHERE ref IS NOT NULL DO NOTHING
     RETURNING id`
 
   if (!claim.length) {
