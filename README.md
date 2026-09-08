@@ -4,7 +4,7 @@ Sign in with Google, upload a portrait, and an AI image model redraws it as a
 hand-inked tattoo stencil. New accounts get **29 free credits**; after that,
 credits cost **₹9 each**. One credit = one stencil.
 
-Live: https://tattoo-stencil-studio-kappa.vercel.app
+Live: **https://sui.ink**
 
 ## What it does
 

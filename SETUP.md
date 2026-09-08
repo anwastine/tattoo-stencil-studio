@@ -4,7 +4,7 @@
 free credits. The only thing left is payments, and only when you want to start
 charging.
 
-Live now: https://tattoo-stencil-studio-kappa.vercel.app
+Live now: **https://sui.ink**
 
 Everything you add goes in the same place:
 **vercel.com → tattoo-stencil-studio → Settings → Environment Variables →
@@ -92,7 +92,7 @@ me the details.
    Top-ups now work with Razorpay's test cards.
 4. For real money: complete KYC, and under **Account Settings → Business
    Website Details** submit these URLs:
-   - `https://tattoo-stencil-studio-kappa.vercel.app/legal/terms.html`
+   - `https://sui.ink/legal/terms.html`
    - `.../legal/privacy.html`
    - `.../legal/refunds.html`
    - `.../legal/shipping.html`
@@ -105,7 +105,7 @@ me the details.
 So a payment still lands if someone closes the tab mid-checkout:
 
 **Settings → Webhooks → Add New Webhook**
-- URL: `https://tattoo-stencil-studio-kappa.vercel.app/api/payments/webhook`
+- URL: `https://sui.ink/api/payments/webhook`
 - Event: `payment.captured`
 - Secret: make one up (or `openssl rand -hex 24`)
 
@@ -156,7 +156,7 @@ each entry needs a Google Fonts family that covers the script.
 
 ## The admin panel
 
-**https://tattoo-stencil-studio-kappa.vercel.app/admin** — or "The books" in
+**https://sui.ink/admin** — or "The books" in
 your account menu. Signed-in admins only; everyone else gets turned away.
 
 It lists every artist who has signed up with their email, mobile number
