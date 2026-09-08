@@ -13,7 +13,7 @@
  * Costs the same one credit as a portrait, refunded if the model fails.
  */
 
-import { clientIp } from './_lib/http.js'
+import { clientIp, readJson } from './_lib/http.js'
 import { requireUser } from './_lib/session.js'
 import { spendCredits, refundCredits, releaseSlot, checkRateLimit } from './_lib/db.js'
 import { creditCostFor } from './_lib/config.js'
@@ -86,13 +86,6 @@ function burstOk(key, limit = 6, windowMs = 60_000) {
   return hits.length <= limit
 }
 
-async function readJson(req) {
-  if (req.body && typeof req.body === 'object') return req.body
-  const chunks = []
-  for await (const c of req) chunks.push(c)
-  const raw = Buffer.concat(chunks).toString('utf8')
-  return raw ? JSON.parse(raw) : {}
-}
 
 export default async function handler(req, res) {
   const send = (status, obj) => {

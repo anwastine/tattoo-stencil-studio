@@ -32,13 +32,6 @@ export function openaiSize(w, h, model) {
   return `${W}x${H}`
 }
 
-async function readJson(req) {
-  if (req.body && typeof req.body === 'object') return req.body
-  const chunks = []
-  for await (const c of req) chunks.push(c)
-  const raw = Buffer.concat(chunks).toString('utf8')
-  return raw ? JSON.parse(raw) : {}
-}
 
 export async function callOpenAI({ model, key, prompt, mime, b64, w, h }) {
   const form = new FormData()

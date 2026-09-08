@@ -18,7 +18,7 @@
  *   OPENAI_IMAGE_MODEL  optional, default gpt-image-2 (falls back to gpt-image-1.5, gpt-image-1)
  */
 
-import { clientIp } from './_lib/http.js'
+import { clientIp, readJson } from './_lib/http.js'
 import { models, apiKey, callOpenAI, isModelMissing } from './_lib/openai.js'
 import { requireUser } from './_lib/session.js'
 import { spendCredits, refundCredits, releaseSlot, checkRateLimit } from './_lib/db.js'
