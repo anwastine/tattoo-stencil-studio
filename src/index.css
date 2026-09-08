@@ -90,6 +90,18 @@ body {
   line-height: 0.95;
 }
 
+/* The brand name itself. Set solid, Pirata One's blackletter U and I fuse and
+   "SUI" reads as "SW" — the tracking is what makes the name legible, so it is
+   a separate class from .wordmark rather than a value anyone might tidy away. */
+.brandmark {
+  font-family: var(--font-display);
+  letter-spacing: 0.16em;
+  line-height: 0.95;
+  /* tracking adds space after the last letter too; pull it back so the mark
+     and the name stay optically centred */
+  margin-right: -0.16em;
+}
+
 /* Ornamental divider: hairline, diamond, hairline. */
 .ornament {
   display: flex;

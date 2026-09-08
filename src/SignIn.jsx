@@ -1,4 +1,5 @@
 import { GoogleSignIn } from './Auth.jsx'
+import { MarkBadge } from './Logo.jsx'
 
 /* ------------------------------------------------------------------ */
 /*  Flash ornaments — the same motif vocabulary as the cursors, drawn  */
@@ -73,15 +74,12 @@ export default function SignIn({ config, onSignedIn }) {
 
       <main className="relative z-10 mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center px-5 py-10 text-center sm:px-6">
         {/* mark */}
-        <span className="mb-5 grid h-14 w-14 place-items-center rounded-sm border border-gold/40 bg-ink-2 text-red-bright">
-          <svg width="30" height="30" viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M8 6 L16 14" /><path d="M13 19 L21 27" /><path d="M11 22 L19 14" /><path d="M15 26 L23 18" /><path d="M20 15 L24 19" />
-          </svg>
-        </span>
+        <MarkBadge box={60} size={40} className="mb-5" />
 
         <div className="ornament mb-3 w-full max-w-xs"><Diamond className="h-2 w-2" /></div>
-        <h1 className="wordmark text-[40px] leading-[0.95] text-paper sm:text-[56px]">Tattoo Stencil Studio</h1>
-        <p className="stamp mt-2 text-[11px] text-gold sm:text-[12px]">Portrait photo → hand-inked stencil</p>
+        <h1 className="brandmark text-[64px] leading-[0.95] text-paper sm:text-[84px]">SUI</h1>
+        <p className="stamp mt-2 text-[12px] text-gold sm:text-[13px]">Tattoo Stencil Studio</p>
+        <p className="stamp mt-1 text-[10px] text-paper-3/60">Portrait photo → hand-inked stencil</p>
         <div className="ornament mt-3 mb-7 w-full max-w-xs"><Diamond className="h-2 w-2" /></div>
 
         <p className="max-w-md text-[15px] leading-relaxed text-paper-2">
@@ -142,11 +140,7 @@ export function Splash() {
   return (
     <div className="grid min-h-dvh place-items-center">
       <div className="flex flex-col items-center gap-4">
-        <span className="grid h-12 w-12 place-items-center rounded-sm border border-gold/30 bg-ink-2 text-red-bright">
-          <svg width="24" height="24" viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M8 6 L16 14" /><path d="M13 19 L21 27" /><path d="M11 22 L19 14" /><path d="M15 26 L23 18" />
-          </svg>
-        </span>
+        <MarkBadge box={48} size={30} />
         <p className="stamp inkpulse text-[11px] text-paper-3/60">Opening the studio</p>
       </div>
     </div>

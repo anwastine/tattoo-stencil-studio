@@ -89,7 +89,7 @@ export function BuyCreditsModal({ config, user, onClose, onCredited }) {
           order_id: order.orderId,
           amount: order.amountPaise,
           currency: 'INR',
-          name: 'Tattoo Stencil Studio',
+          name: 'SUI — Tattoo Stencil Studio',
           description: `${order.credits} credits`,
           prefill: order.prefill,
           theme: { color: '#e5b567' },

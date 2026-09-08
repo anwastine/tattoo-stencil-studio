@@ -8,6 +8,7 @@ import Lettering from './Lettering.jsx'
 import { paintStencil, downloadStencil } from './stencil.js'
 import { CreditTicket, AccountMenu, BuyCreditsModal } from './Wallet.jsx'
 import { startTattooCursor } from './cursors.js'
+import { Lockup } from './Logo.jsx'
 
 /* ------------------------------------------------------------------ */
 /*  constants                                                          */
@@ -391,17 +392,7 @@ export default function App() {
       {/* ---------------- header ---------------- */}
       <header className="border-b border-gold/20 bg-ink/80 backdrop-blur">
         <div className="flex items-center justify-between gap-3 px-4 py-3 sm:px-6">
-          <div className="flex min-w-0 items-center gap-3">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-sm border border-gold/40 bg-ink-2 text-red-bright">
-              <svg width="22" height="22" viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M8 6 L16 14" /><path d="M13 19 L21 27" /><path d="M11 22 L19 14" /><path d="M15 26 L23 18" /><path d="M20 15 L24 19" />
-              </svg>
-            </span>
-            <div className="min-w-0">
-              <h1 className="wordmark truncate text-[26px] text-paper sm:text-[30px]">Tattoo Stencil Studio</h1>
-              <p className="stamp hidden text-[10px] text-paper-3/70 sm:block">Portrait to hand-inked stencil · ready to transfer</p>
-            </div>
-          </div>
+          <Lockup />
 
           <div className="mx-2 hidden shrink-0 md:block">
             <Segmented value={mode} onChange={setMode} options={[{ value: 'portrait', label: 'Portrait' }, { value: 'lettering', label: 'Lettering' }]} />
