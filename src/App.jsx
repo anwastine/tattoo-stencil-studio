@@ -393,7 +393,11 @@ export default function App() {
   return (
     <div className="flex min-h-dvh flex-col lg:h-dvh lg:min-h-0 lg:overflow-hidden">
       {/* ---------------- header ---------------- */}
-      <header className="border-b border-gold/20 bg-ink/80 backdrop-blur">
+      {/* relative z-40 is load-bearing: backdrop-blur makes the header its own
+          stacking context, so the account menu inside it can only be ordered
+          against its siblings here. Without it the positioned panels in <main>
+          paint straight over the open menu. Modals sit at z-50, above this. */}
+      <header className="relative z-40 border-b border-gold/20 bg-ink/80 backdrop-blur">
         <div className="flex items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <Lockup />
 
