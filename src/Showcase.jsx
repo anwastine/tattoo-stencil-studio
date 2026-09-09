@@ -171,6 +171,48 @@ export function HeroGlimpse() {
   )
 }
 
+/* ---------------- the walkthrough ---------------- */
+
+/**
+ * The training video, click to play.
+ *
+ * `preload="none"` matters: the file is 13 MB, and a landing page should not
+ * spend that on someone who never presses play. The poster frame carries the
+ * weight until they do.
+ */
+export function Walkthrough() {
+  return (
+    <section className="w-full">
+      <div className="text-center">
+        <p className="stamp text-[10px] text-gold">Four minutes, start to finish</p>
+        <h2 className="wordmark mt-1 text-[30px] leading-none text-paper sm:text-[38px]">Watch it work</h2>
+        <p className="mx-auto mt-2 max-w-lg text-[13px] leading-relaxed text-paper-3/80">
+          A photo becoming a stencil, lettering in ten scripts, and the part most people get wrong —
+          printing it at the exact size you are going to tattoo.
+        </p>
+      </div>
+
+      <div className="mt-6 overflow-hidden rounded-sm border border-gold/30 bg-ink shadow-[0_30px_70px_-40px_rgba(0,0,0,.95)]">
+        <video
+          controls
+          preload="none"
+          playsInline
+          poster="/sui-training-poster.webp"
+          className="block aspect-video w-full bg-ink"
+        >
+          <source src="/sui-training.mp4" type="video/mp4" />
+          <track kind="captions" src="/sui-training.vtt" srcLang="en" label="English" default />
+          Your browser cannot play this video.
+        </video>
+      </div>
+
+      <p className="mt-2 text-center text-[10px] leading-snug text-paper-3/50">
+        Captions included · every screen in it is the real site, not a mock-up
+      </p>
+    </section>
+  )
+}
+
 /* ---------------- the section ---------------- */
 
 export default function Showcase({ lettering = [] }) {

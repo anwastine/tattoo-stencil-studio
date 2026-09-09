@@ -1,6 +1,6 @@
 import { GoogleSignIn } from './Auth.jsx'
 import { MarkBadge } from './Logo.jsx'
-import Showcase, { HeroGlimpse } from './Showcase.jsx'
+import Showcase, { HeroGlimpse, Walkthrough } from './Showcase.jsx'
 
 /* ------------------------------------------------------------------ */
 /*  Flash ornaments — the same motif vocabulary as the cursors, drawn  */
@@ -124,6 +124,8 @@ export default function SignIn({ config, onSignedIn }) {
             </div>
           ))}
         </div>
+
+        <div className="mt-16 w-full"><Walkthrough /></div>
 
         <Showcase lettering={LETTERING} />
       </main>
