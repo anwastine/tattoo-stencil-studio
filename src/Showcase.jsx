@@ -179,6 +179,9 @@ export function HeroGlimpse() {
  * `preload="none"` matters: the file is 13 MB, and a landing page should not
  * spend that on someone who never presses play. The poster frame carries the
  * weight until they do.
+ *
+ * No caption track: the narration is the whole point and subtitles were sitting
+ * over the interface being demonstrated.
  */
 export function Walkthrough() {
   return (
@@ -201,13 +204,12 @@ export function Walkthrough() {
           className="block aspect-video w-full bg-ink"
         >
           <source src="/sui-training.mp4" type="video/mp4" />
-          <track kind="captions" src="/sui-training.vtt" srcLang="en" label="English" default />
           Your browser cannot play this video.
         </video>
       </div>
 
       <p className="mt-2 text-center text-[10px] leading-snug text-paper-3/50">
-        Captions included · every screen in it is the real site, not a mock-up
+        Every screen in it is the real site, not a mock-up
       </p>
     </section>
   )
