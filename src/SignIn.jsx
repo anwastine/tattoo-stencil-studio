@@ -1,5 +1,6 @@
 import { GoogleSignIn } from './Auth.jsx'
 import { MarkBadge } from './Logo.jsx'
+import Showcase from './Showcase.jsx'
 
 /* ------------------------------------------------------------------ */
 /*  Flash ornaments — the same motif vocabulary as the cursors, drawn  */
@@ -53,6 +54,16 @@ const Diamond = ({ className = '' }) => (
   </svg>
 )
 
+/* Real downloads from this site. Swapping one is a file plus a line here. */
+const LETTERING = [
+  { src: '/showcase/let-telugu-amma.webp', label: 'అమ్మ · Telugu', meta: 'Emotional · mother & child', alt: 'Telugu lettering tattoo reading amma' },
+  { src: '/showcase/let-tamil-kaadhal.webp', label: 'காதல் · Tamil', meta: 'Romantic · heart', alt: 'Tamil lettering tattoo reading kaadhal' },
+  { src: '/showcase/let-hindi-aai.webp', label: 'आई · Hindi', meta: 'Emotional · mother & child', alt: 'Hindi lettering tattoo reading aai' },
+  { src: '/showcase/let-tamil-thaai.webp', label: 'தாய் · Tamil', meta: 'Emotional · mother & child', alt: 'Tamil lettering tattoo reading thaai' },
+  { src: '/showcase/let-kannada-preeti.webp', label: 'ಪ್ರೀತಿ · Kannada', meta: 'Ornamental · lotus', alt: 'Kannada lettering tattoo reading preeti' },
+  { src: '/showcase/let-bengali-bhalo.webp', label: 'ভালোবাসা · Bengali', meta: 'Minimal · infinity', alt: 'Bengali lettering tattoo reading bhalobasa' },
+]
+
 const POINTS = [
   { numeral: 'I', title: 'Five stencil styles', body: 'Studio realism, fine line, bold traditional, pure dotwork, or a full contour map for black-and-grey work.' },
   { numeral: 'II', title: 'Ready for the machine', body: 'Threshold to solid ink, mirror it for transfer, drop the background out, and download a full-size PNG.' },
@@ -72,7 +83,7 @@ export default function SignIn({ config, onSignedIn }) {
       <Dagger className="pointer-events-none absolute -right-14 top-1/3 h-64 w-64 rotate-12 text-red/[0.07] sm:h-80 sm:w-80" />
       <Swallow className="pointer-events-none absolute -bottom-12 left-1/4 h-64 w-64 -rotate-6 text-gold/[0.05] sm:h-80 sm:w-80" />
 
-      <main className="relative z-10 mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center px-5 py-10 text-center sm:px-6">
+      <main className="relative z-10 mx-auto flex w-full max-w-5xl flex-1 flex-col items-center justify-center px-5 py-10 text-center sm:px-6">
         {/* mark */}
         <MarkBadge box={60} size={40} className="mb-5" />
 
@@ -111,6 +122,8 @@ export default function SignIn({ config, onSignedIn }) {
             </div>
           ))}
         </div>
+
+        <Showcase lettering={LETTERING} />
       </main>
 
       <footer className="relative z-10 px-5 pb-8 text-center">
