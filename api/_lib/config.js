@@ -36,13 +36,17 @@ export const paiseFor = (credits) => credits * RUPEES_PER_CREDIT * 100
  * Referrals. The referrer is paid once, the first time someone they invited
  * buys credits.
  *
- * MIND THE MATHS: a credit sells for RUPEES_PER_CREDIT but costs roughly ₹5-7
- * to draw, so paying 10 credits on a 10-credit (₹90) purchase spends more than
- * that sale earns. It only makes sense read as customer acquisition — you are
- * buying a paying customer for about ₹60 of compute. Raise the minimum or drop
- * the reward here if that is not the trade you want.
+ * THE MATHS: a credit sells for RUPEES_PER_CREDIT and costs roughly ₹5-7 to
+ * draw, so a ₹90 starter pack earns about ₹30 of margin. Paying 5 credits back
+ * spends about that much, which puts a referral at break-even — and slightly
+ * ahead in practice, since a credit only costs anything once it is spent.
+ *
+ * The minimum stays at the smallest pack on purpose. Raising it to 25 would
+ * make each payout profitable, but the ₹90 pack is what most people buy first,
+ * so most referrals would never pay out at all — and a programme people invite
+ * to and earn nothing from is one they stop using.
  */
-export const REFERRAL_CREDITS = 10
+export const REFERRAL_CREDITS = 5
 export const REFERRAL_MIN_PURCHASE = 10
 
 /** Anti-abuse limits. */

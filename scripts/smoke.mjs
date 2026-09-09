@@ -262,6 +262,13 @@ const sum = await referralSummary(alice.id)
 check('referral: the invite panel counts joined, bought and earned',
   sum.invited === 1 && sum.converted === 1 && sum.creditsEarned === REFERRAL_CREDITS, JSON.stringify(sum))
 
+/* Below the minimum pays nothing — the threshold is the other half of the
+   economics, so it needs a test of its own. */
+const { REFERRAL_MIN_PURCHASE } = await import('../api/_lib/config.js')
+const tooSmall = await rewardReferrer(bob.id, REFERRAL_MIN_PURCHASE - 1)
+check('referral: a purchase under the minimum pays nothing',
+  !tooSmall.paid && tooSmall.reason === 'below-minimum', JSON.stringify(tooSmall))
+
 /* A purchase by someone nobody invited must pay nobody. */
 const solo = await rewardReferrer(alice.id, 10)
 check('referral: an uninvited buyer pays nobody', !solo.paid && solo.reason === 'not-referred', JSON.stringify(solo))
