@@ -19,6 +19,8 @@ import { SignJWT } from 'jose'
 import { neon } from '@neondatabase/serverless'
 import { upsertUser } from '../api/_lib/db.js'
 
+const sqlRef = neon(process.env.DATABASE_URL)
+
 const SUB = 'SMOKE-' + Math.random().toString(36).slice(2)
 const EMAIL = `smoke.${Date.now()}@example.invalid`
 
@@ -207,6 +209,72 @@ globalThis.fetch = realFetch
 check('payments: a genuine signature is accepted', replay.status === 200, `${replay.status} ${replay.json?.error}`)
 check('payments: /verify sees the order already credited', replay.json?.alreadyCredited === true && replay.json?.added === 0, JSON.stringify(replay.json))
 check('payments: /verify after the webhook does not double-credit', (await getUser(user.id)).credits === afterFirst, 'credits moved when the browser confirmed an already-credited order')
+
+/* ---------------- referrals ---------------- */
+/*
+ * A referral pays real credits, so it gets the same scrutiny as a payment:
+ * it must fire once, only on a genuinely new account, never for yourself, and
+ * never twice however many times the invited artist buys.
+ */
+
+const { attachReferrer, rewardReferrer, ensureReferralCode, referralSummary, createOrderRow: mkOrder, creditOrder, getUser: readUser } =
+  await import('../api/_lib/db.js')
+const { REFERRAL_CREDITS } = await import('../api/_lib/config.js')
+
+const alice = await ensureReferralCode(
+  await upsertUser({ sub: 'SMOKE-A-' + Math.random().toString(36).slice(2), email: `alice.${Date.now()}@example.invalid`, name: 'Alice', picture: null }))
+check('referral: everyone gets a code', /^[A-Z0-9]{6}$/.test(alice.referral_code || ''), alice.referral_code)
+
+const bob = await upsertUser({
+  sub: 'SMOKE-B-' + Math.random().toString(36).slice(2),
+  email: `bob.${Date.now()}@example.invalid`,
+  name: 'Bob',
+  picture: null,
+  referralCode: alice.referral_code,
+})
+check('referral: a new account records who invited it', String(bob.referred_by) === String(alice.id), `referred_by=${bob.referred_by}`)
+
+const self = await attachReferrer(alice, alice.referral_code)
+check('referral: you cannot invite yourself', !self.ok && self.reason === 'self', JSON.stringify(self))
+
+const again = await attachReferrer(bob, alice.referral_code)
+check('referral: the referrer is only ever set once', !again.ok && again.reason === 'already-referred', JSON.stringify(again))
+
+const bogus = await attachReferrer(bob, 'ZZZZZZ')
+check('referral: an unknown code is refused', !bogus.ok && bogus.reason === 'unknown-code', JSON.stringify(bogus))
+
+/* Bob buys. Alice should be paid exactly once, however many orders follow. */
+const aliceBefore = (await readUser(alice.id)).credits
+const o1 = 'order_ref1_' + Math.random().toString(36).slice(2, 8)
+await mkOrder({ id: o1, userId: bob.id, credits: 10, amountPaise: 9000 })
+await creditOrder({ orderId: o1, paymentId: 'pay_ref1' })
+const aliceAfterFirst = (await readUser(alice.id)).credits
+check('referral: the referrer is paid on the first purchase',
+  aliceAfterFirst === aliceBefore + REFERRAL_CREDITS, `${aliceBefore} -> ${aliceAfterFirst}, expected +${REFERRAL_CREDITS}`)
+
+const o2 = 'order_ref2_' + Math.random().toString(36).slice(2, 8)
+await mkOrder({ id: o2, userId: bob.id, credits: 25, amountPaise: 22500 })
+await creditOrder({ orderId: o2, paymentId: 'pay_ref2' })
+check('referral: a second purchase does not pay again',
+  (await readUser(alice.id)).credits === aliceAfterFirst, 'the referrer was paid twice')
+
+const sum = await referralSummary(alice.id)
+check('referral: the invite panel counts joined, bought and earned',
+  sum.invited === 1 && sum.converted === 1 && sum.creditsEarned === REFERRAL_CREDITS, JSON.stringify(sum))
+
+/* A purchase by someone nobody invited must pay nobody. */
+const solo = await rewardReferrer(alice.id, 10)
+check('referral: an uninvited buyer pays nobody', !solo.paid && solo.reason === 'not-referred', JSON.stringify(solo))
+
+for (const u of [bob, alice]) {
+  await sqlRef`DELETE FROM orders WHERE user_id = ${u.id}`
+  await sqlRef`DELETE FROM ledger WHERE user_id = ${u.id}`
+  await sqlRef`DELETE FROM welcome_grants WHERE user_id = ${u.id}`
+  await sqlRef`UPDATE users SET referred_by = NULL WHERE id = ${u.id}`
+}
+await sqlRef`DELETE FROM ledger WHERE ref = ${'referral:' + bob.id}`
+await sqlRef`DELETE FROM users WHERE id = ${bob.id}`
+await sqlRef`DELETE FROM users WHERE id = ${alice.id}`
 
 /* ---------------- cleanup ---------------- */
 

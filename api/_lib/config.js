@@ -32,6 +32,19 @@ export const packById = (id) => PACKS.find((p) => p.id === id) || null
 /** Razorpay works in paise. */
 export const paiseFor = (credits) => credits * RUPEES_PER_CREDIT * 100
 
+/**
+ * Referrals. The referrer is paid once, the first time someone they invited
+ * buys credits.
+ *
+ * MIND THE MATHS: a credit sells for RUPEES_PER_CREDIT but costs roughly ₹5-7
+ * to draw, so paying 10 credits on a 10-credit (₹90) purchase spends more than
+ * that sale earns. It only makes sense read as customer acquisition — you are
+ * buying a paying customer for about ₹60 of compute. Raise the minimum or drop
+ * the reward here if that is not the trade you want.
+ */
+export const REFERRAL_CREDITS = 10
+export const REFERRAL_MIN_PURCHASE = 10
+
 /** Anti-abuse limits. */
 export const LIMITS = {
   generationsPerHour: 30, // per user
@@ -46,4 +59,6 @@ export const publicConfig = () => ({
   outputSize: OUTPUT_SIZE,
   creditsPerStencil: CREDIT_COST[OUTPUT_SIZE],
   packs: PACKS.map((p) => ({ ...p, rupees: p.credits * RUPEES_PER_CREDIT })),
+  referralCredits: REFERRAL_CREDITS,
+  referralMinPurchase: REFERRAL_MIN_PURCHASE,
 })

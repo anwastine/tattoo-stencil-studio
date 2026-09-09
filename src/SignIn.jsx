@@ -1,4 +1,5 @@
 import { GoogleSignIn } from './Auth.jsx'
+import { storedReferral } from './referral.js'
 import { MarkBadge } from './Logo.jsx'
 import Showcase, { HeroGlimpse, Walkthrough } from './Showcase.jsx'
 
@@ -74,6 +75,7 @@ const POINTS = [
 
 export default function SignIn({ config, onSignedIn }) {
   const welcomeCredits = config?.welcomeCredits ?? 10
+  const invited = storedReferral()
   const rupees = config?.rupeesPerCredit ?? 9
 
   return (
@@ -102,6 +104,11 @@ export default function SignIn({ config, onSignedIn }) {
 
         {/* the gate */}
         <div className="rule-double mt-8 w-full max-w-sm rounded-sm p-6">
+          {invited && (
+            <p className="stamp mb-2 rounded-sm border border-gold/40 bg-gold/10 px-3 py-1.5 text-[10px] text-gold">
+              Invited by a fellow artist
+            </p>
+          )}
           <p className="wordmark text-2xl text-paper">{welcomeCredits} stencils, on the house</p>
           <p className="mx-auto mt-2 mb-5 max-w-[17rem] text-[12px] leading-snug text-paper-3/80">
             Sign in with Google and start drawing straight away. No card, no trial period, nothing to cancel.

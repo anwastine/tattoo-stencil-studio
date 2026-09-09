@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { storedReferral, clearReferral } from './referral.js'
 import { api, loadScript } from './api.js'
 
 const GSI = 'https://accounts.google.com/gsi/client'
@@ -18,7 +19,11 @@ export function GoogleSignIn({ clientId, onSignedIn, theme = 'filled_black', wid
       setBusy(true)
       setError(null)
       try {
-        const out = await api('/api/auth/google', { method: 'POST', body: { credential: response.credential } })
+        const out = await api('/api/auth/google', {
+          method: 'POST',
+          body: { credential: response.credential, ref: storedReferral() },
+        })
+        clearReferral()
         onSignedIn?.(out)
       } catch (e) {
         setError(e.message)

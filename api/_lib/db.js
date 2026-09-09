@@ -9,8 +9,8 @@
  */
 
 import { neon } from '@neondatabase/serverless'
-import { httpError } from './http.js'
-import { WELCOME_CREDITS, LIMITS } from './config.js'
+import { httpError, redact } from './http.js'
+import { WELCOME_CREDITS, LIMITS, REFERRAL_CREDITS, REFERRAL_MIN_PURCHASE } from './config.js'
 
 const URL_KEYS = ['DATABASE_URL', 'POSTGRES_URL', 'NEON_DATABASE_URL', 'DATABASE_URL_UNPOOLED', 'POSTGRES_URL_NON_POOLING']
 
@@ -52,6 +52,12 @@ export function init() {
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT`
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_asked BOOLEAN NOT NULL DEFAULT false`
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_at TIMESTAMPTZ`
+    // Referrals: everyone gets a code; referred_by is set once, at sign-up.
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code TEXT`
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by BIGINT`
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_at TIMESTAMPTZ`
+    await sql`CREATE UNIQUE INDEX IF NOT EXISTS users_referral_code_idx ON users (referral_code) WHERE referral_code IS NOT NULL`
+    await sql`CREATE INDEX IF NOT EXISTS users_referred_by_idx ON users (referred_by)`
     // One welcome bonus per real mailbox, not per Google account row.
     await sql`
       CREATE TABLE IF NOT EXISTS welcome_grants (
@@ -110,7 +116,7 @@ export function emailKey(email) {
 }
 
 /** Find or create the user for a verified Google profile; grant the bonus once. */
-export async function upsertUser({ sub, email, name, picture }) {
+export async function upsertUser({ sub, email, name, picture, referralCode }) {
   await init()
   const sql = client()
   const key = emailKey(email)
@@ -141,6 +147,16 @@ export async function upsertUser({ sub, email, name, picture }) {
       VALUES (${user.id}, 'welcome', ${WELCOME_CREDITS}, ${'welcome:' + key}, ${JSON.stringify({ email: user.email })})
       ON CONFLICT DO NOTHING`
   }
+
+  user = await ensureReferralCode(user)
+
+  /* An invite only counts on a genuinely new account — `claimed` is the same
+     signal the welcome bonus uses, so an existing artist cannot be "referred"
+     by pasting a link. */
+  if (referralCode && claimed.length) {
+    try { const r = await attachReferrer(user, referralCode); if (r.ok) user = r.user }
+    catch { /* a bad code must never block a sign-in */ }
+  }
   return user
 }
 
@@ -161,8 +177,112 @@ export const publicUser = (u) =>
     phone: u.phone || null,
     // drives the one-time "join the channel" prompt
     askPhone: !u.phone && !u.phone_asked,
+    referralCode: u.referral_code || null,
     isAdmin: isAdmin(u.email),
   }
+
+/* ---------------- referrals ---------------- */
+
+/* No 0/O/1/I/L: these codes get read aloud and written down. */
+const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
+const newCode = (n = 6) =>
+  Array.from({ length: n }, () => CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)]).join('')
+
+/** Give a user a referral code if they do not have one yet. */
+export async function ensureReferralCode(user) {
+  if (user?.referral_code) return user
+  await init()
+  const sql = client()
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const rows = await sql`
+      UPDATE users SET referral_code = ${newCode()}
+       WHERE id = ${user.id} AND referral_code IS NULL
+      RETURNING *`
+    if (rows.length) return rows[0]
+    // Either someone else won the race for this row, or the code collided.
+    const [fresh] = await sql`SELECT * FROM users WHERE id = ${user.id}`
+    if (fresh?.referral_code) return fresh
+  }
+  return user
+}
+
+export async function findByReferralCode(code) {
+  if (!code) return null
+  await init()
+  const rows = await client()`
+    SELECT * FROM users WHERE referral_code = ${String(code).trim().toUpperCase()}`
+  return rows[0] || null
+}
+
+/**
+ * Record who invited a new account. Only ever set once, and never to yourself:
+ * `referred_by IS NULL` in the WHERE is what makes a second attempt a no-op.
+ */
+export async function attachReferrer(user, code) {
+  const referrer = await findByReferralCode(code)
+  if (!referrer) return { ok: false, reason: 'unknown-code' }
+  if (String(referrer.id) === String(user.id)) return { ok: false, reason: 'self' }
+  // An alias of the same mailbox is the same person.
+  if (referrer.email_key === user.email_key) return { ok: false, reason: 'self' }
+
+  const rows = await client()`
+    UPDATE users SET referred_by = ${referrer.id}, referred_at = now()
+     WHERE id = ${user.id} AND referred_by IS NULL
+    RETURNING *`
+  if (!rows.length) return { ok: false, reason: 'already-referred' }
+  return { ok: true, user: rows[0], referrer }
+}
+
+/**
+ * Pay the referrer, once, when someone they invited buys.
+ *
+ * The ledger's unique (kind, ref) index is the guard — a second purchase by the
+ * same person finds the row already there and does nothing. ON CONFLICT carries
+ * no target on purpose: that index is partial, and naming the columns without
+ * repeating its WHERE clause makes Postgres reject the statement outright.
+ */
+export async function rewardReferrer(referredUserId, creditsBought) {
+  if (creditsBought < REFERRAL_MIN_PURCHASE) return { paid: false, reason: 'below-minimum' }
+  await init()
+  const sql = client()
+  const referred = await getUser(referredUserId)
+  if (!referred?.referred_by) return { paid: false, reason: 'not-referred' }
+
+  const claim = await sql`
+    INSERT INTO ledger (user_id, kind, credits, ref, meta)
+    VALUES (${referred.referred_by}, 'referral', ${REFERRAL_CREDITS},
+            ${'referral:' + referredUserId},
+            ${JSON.stringify({ referred: String(referredUserId), creditsBought })})
+    ON CONFLICT DO NOTHING
+    RETURNING id`
+  if (!claim.length) return { paid: false, reason: 'already-paid' }
+
+  const rows = await sql`
+    UPDATE users SET credits = credits + ${REFERRAL_CREDITS}
+     WHERE id = ${referred.referred_by} RETURNING credits`
+  return { paid: true, referrerId: String(referred.referred_by), credits: rows[0]?.credits ?? null }
+}
+
+/** What to show someone on their own invite panel. */
+export async function referralSummary(userId) {
+  await init()
+  const sql = client()
+  const [counts] = await sql`
+    SELECT count(*)::int AS invited,
+           count(*) FILTER (WHERE EXISTS (
+             SELECT 1 FROM ledger l
+              WHERE l.kind = 'referral' AND l.ref = 'referral:' || u.id
+           ))::int AS converted
+      FROM users u WHERE u.referred_by = ${userId}`
+  const [earned] = await sql`
+    SELECT COALESCE(sum(credits), 0)::int AS credits
+      FROM ledger WHERE user_id = ${userId} AND kind = 'referral'`
+  return {
+    invited: counts?.invited ?? 0,
+    converted: counts?.converted ?? 0,
+    creditsEarned: earned?.credits ?? 0,
+  }
+}
 
 /* ---------------- phone ---------------- */
 
@@ -381,7 +501,14 @@ export async function creditOrder({ orderId, paymentId }) {
     UPDATE users SET credits = credits + ${order.credits} WHERE id = ${order.user_id} RETURNING credits`
   await sql`
     UPDATE orders SET status = 'paid', payment_id = ${paymentId}, paid_at = now() WHERE id = ${orderId}`
-  return { credited: true, credits: rows[0]?.credits ?? null, userId: String(order.user_id), addedCredits: order.credits }
+
+  /* Whoever invited this buyer gets paid now, once, on their first purchase.
+     Never let it break the crediting the customer actually paid for. */
+  let referral = null
+  try { referral = await rewardReferrer(order.user_id, order.credits) }
+  catch (e) { console.error('referral payout failed', redact(e.message)) }
+
+  return { credited: true, credits: rows[0]?.credits ?? null, userId: String(order.user_id), addedCredits: order.credits, referral }
 }
 
 export async function recentLedger(userId, limit = 20) {

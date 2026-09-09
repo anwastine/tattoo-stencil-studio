@@ -25,7 +25,7 @@ export function CreditTicket({ credits, onClick }) {
   )
 }
 
-export function AccountMenu({ user, onBuy, onSignOut }) {
+export function AccountMenu({ user, onBuy, onInvite, onSignOut }) {
   const [open, setOpen] = useState(false)
   useEffect(() => {
     if (!open) return
@@ -53,6 +53,7 @@ export function AccountMenu({ user, onBuy, onSignOut }) {
             </p>
           </div>
           <button type="button" onClick={() => { setOpen(false); onBuy() }} className="stamp block w-full px-3 py-2.5 text-left text-[11px] text-paper-2 hover:bg-gold/10">Add credits</button>
+          <button type="button" onClick={() => { setOpen(false); onInvite?.() }} className="stamp block w-full px-3 py-2.5 text-left text-[11px] text-paper-2 hover:bg-gold/10">Invite an artist</button>
           {user.isAdmin && (
             <a href="/admin" className="stamp block w-full px-3 py-2.5 text-left text-[11px] text-gold hover:bg-gold/10">The books</a>
           )}

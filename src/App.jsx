@@ -10,6 +10,7 @@ import { CreditTicket, AccountMenu, BuyCreditsModal } from './Wallet.jsx'
 import { startTattooCursor } from './cursors.js'
 import { Lockup } from './Logo.jsx'
 import PrintDialog from './PrintDialog.jsx'
+import { InviteModal } from './Invite.jsx'
 
 /* ------------------------------------------------------------------ */
 /*  constants                                                          */
@@ -210,6 +211,7 @@ export default function App() {
   const [error, setError] = useState(null)
   const [result, setResult] = useState(null)
   const [showPrint, setShowPrint] = useState(false)
+  const [showInvite, setShowInvite] = useState(false)
   const [history, setHistory] = useState([])
   const [threshold, setThreshold] = useState(0)
   const [ink, setInk] = useState('#0b0a09')
@@ -412,7 +414,7 @@ export default function App() {
                 </button>
               </>
             )}
-            <AccountMenu user={user} onBuy={() => setShowBuy(true)} onSignOut={signOut} />
+            <AccountMenu user={user} onBuy={() => setShowBuy(true)} onInvite={() => setShowInvite(true)} onSignOut={signOut} />
           </div>
         </div>
       </header>
@@ -630,6 +632,8 @@ export default function App() {
       {showBuy && (
         <BuyCreditsModal config={config} user={user} onClose={() => setShowBuy(false)} onCredited={(credits) => setCredits(credits)} />
       )}
+
+      {showInvite && <InviteModal onClose={() => setShowInvite(false)} />}
 
       {showPrint && result && (
         <PrintDialog
