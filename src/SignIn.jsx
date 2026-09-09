@@ -1,6 +1,6 @@
 import { GoogleSignIn } from './Auth.jsx'
 import { MarkBadge } from './Logo.jsx'
-import Showcase from './Showcase.jsx'
+import Showcase, { HeroGlimpse } from './Showcase.jsx'
 
 /* ------------------------------------------------------------------ */
 /*  Flash ornaments — the same motif vocabulary as the cursors, drawn  */
@@ -91,7 +91,9 @@ export default function SignIn({ config, onSignedIn }) {
         <h1 className="brandmark text-[64px] leading-[0.95] text-paper sm:text-[84px]">SUI</h1>
         <p className="stamp mt-2 text-[12px] text-gold sm:text-[13px]">Tattoo Stencil Studio</p>
         <p className="stamp mt-1 text-[10px] text-paper-3/60">Portrait photo → hand-inked stencil</p>
-        <div className="ornament mt-3 mb-7 w-full max-w-xs"><Diamond className="h-2 w-2" /></div>
+        <div className="ornament mt-3 mb-5 w-full max-w-xs"><Diamond className="h-2 w-2" /></div>
+
+        <HeroGlimpse />
 
         <p className="max-w-md text-[15px] leading-relaxed text-paper-2">
           Upload a client's photo and get a clean, transfer-ready stencil in under a minute —

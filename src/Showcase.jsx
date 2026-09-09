@@ -114,6 +114,63 @@ function useScriptFonts() {
   }, [])
 }
 
+/* ---------------- the glimpse above the fold ---------------- */
+
+/* Portraits are 4:5, lettering is wide; fixed height with a per-tile width
+   keeps them on one baseline instead of a ragged row. */
+const TILES = [
+  { src: '/showcase/thumb-face.webp', label: 'Fine line', ratio: 0.78 },
+  { src: '/showcase/thumb-telugu.webp', label: 'Telugu · అమ్మ', ratio: 1.3 },
+  { src: '/showcase/thumb-dotwork.webp', label: 'Dotwork', ratio: 0.78 },
+  { src: '/showcase/thumb-tamil.webp', label: 'Tamil · காதல்', ratio: 1.3 },
+]
+
+/**
+ * A strip of real work, high enough that nobody has to scroll to understand
+ * what this is. The first tile animates itself: the photo turns to ink and
+ * back, which explains the product faster than the paragraph under it.
+ */
+export function HeroGlimpse() {
+  return (
+    <div className="mb-7 w-full">
+      <div className="scrollbar-thin -mx-5 overflow-x-auto px-5 pb-2 sm:mx-0 sm:px-0">
+        <div className="mx-auto flex w-max snap-x gap-2">
+        <figure
+          className="relative h-[152px] shrink-0 snap-start overflow-hidden rounded-sm border border-gold/40 bg-paper sm:h-[172px]"
+          style={{ aspectRatio: '0.78' }}
+        >
+          <img src="/showcase/thumb-photo.webp" alt="A portrait photograph" className="absolute inset-0 h-full w-full object-cover" />
+          <img src="/showcase/thumb-studio.webp" alt="The same portrait as a tattoo stencil" className="ink-wipe absolute inset-0 h-full w-full object-cover" />
+          <figcaption className="stamp absolute inset-x-0 bottom-0 bg-ink/75 px-2 py-1 text-[8px] text-gold backdrop-blur-[1px]">
+            Photo → stencil
+          </figcaption>
+        </figure>
+
+        {TILES.map((t) => (
+          <figure
+            key={t.src}
+            className="relative h-[152px] shrink-0 snap-start overflow-hidden rounded-sm border border-gold/25 bg-paper sm:h-[172px]"
+            style={{ aspectRatio: String(t.ratio) }}
+          >
+            <img src={t.src} alt={t.label} className="absolute inset-0 h-full w-full object-cover" />
+            <figcaption className="stamp absolute inset-x-0 bottom-0 bg-ink/70 px-2 py-1 text-[8px] text-paper-2 backdrop-blur-[1px]">
+              {t.label}
+            </figcaption>
+          </figure>
+        ))}
+        </div>
+      </div>
+
+      <p className="stamp mt-1 flex items-center justify-center gap-1.5 text-[9px] text-paper-3/50">
+        Every one of these came out of SUI
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </p>
+    </div>
+  )
+}
+
 /* ---------------- the section ---------------- */
 
 export default function Showcase({ lettering = [] }) {

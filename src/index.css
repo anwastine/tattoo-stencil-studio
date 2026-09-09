@@ -102,6 +102,19 @@ body {
   margin-right: -0.16em;
 }
 
+/* Hero glimpse: the stencil wipes itself across the photo, so someone who
+   never scrolls still sees what this place does. Paused for anyone who has
+   asked their system for less motion. */
+@keyframes ink-wipe {
+  0%, 6%    { clip-path: inset(0 0 0 84%); }
+  47%, 53%  { clip-path: inset(0 0 0 10%); }
+  94%, 100% { clip-path: inset(0 0 0 84%); }
+}
+.ink-wipe { animation: ink-wipe 7.5s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .ink-wipe { animation: none; clip-path: inset(0 0 0 50%); }
+}
+
 /* Ornamental divider: hairline, diamond, hairline. */
 .ornament {
   display: flex;
